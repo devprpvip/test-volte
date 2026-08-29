@@ -1,0 +1,26 @@
+name: CheckTimeDeploy
+version: '${project.version}'
+main: dev.minhhaudev.checktimedeploy.CheckTimeDeploy
+api-version: '1.21'
+author: minhhaudev
+authors: [minhhaudev]
+description: Super lightweight plugin to check deploy time - Java 21 / 1.21.x
+website: https://github.com/minhhaudev
+prefix: CheckTimeDeploy
+
+softdepend: [PlaceholderAPI]
+commands:
+  checktimedeploy:
+    description: Check deploy time and uptime + stats
+    usage: /<command> [player|top|reload|setdeploy|set|add|reset|help]
+    aliases: [ctd, deploytime, checkdeploy]
+    permission: checktimedeploy.use
+    permission-message: §cBạn không có quyền dùng lệnh này.
+
+permissions:
+  checktimedeploy.use:
+    description: Allow to use checktimedeploy command
+    default: true
+  checktimedeploy.admin:
+    description: Admin permission
+    default: op

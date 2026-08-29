@@ -1,0 +1,28 @@
+# CheckTimeDeploy - by minhhaudev | Java 21 | 1.21.x
+# Thời gian deploy cố định - tính theo thời gian thực
+deploy:
+  time: "2024-11-12 20:16:08"
+  timezone: "Asia/Ho_Chi_Minh"
+  format-date: "dd/MM/yyyy HH:mm:ss"
+  format-duration: "d ngày H giờ m phút"
+
+storage:
+  type: sqlite
+  file: "database.db"
+  # Auto save interval không cần vì SQLite ghi ngay lập tức
+
+display:
+  header: "&b&l CheckTimeDeploy &7- &aby minhhaudev"
+  footer-line: "&7&m--------------------------------"
+  show-online: true
+  show-top: true
+
+messages:
+  no-permission: "&cBạn không có quyền dùng lệnh này."
+  reload: "&aĐã reload config và đồng bộ deploy time."
+  setdeploy-success: "&aĐã đổi deploy time thành &e%time% &7(%timezone%)"
+  setdeploy-invalid: "&cĐịnh dạng không hợp lệ! Dùng &e dd/MM/yyyy HH:mm:ss &c ví dụ 12/11/2024 20:16:08"
+  player-not-found: "&cKhông tìm thấy dữ liệu người chơi &e%player%"
+
+placeholder:
+  enabled: true
