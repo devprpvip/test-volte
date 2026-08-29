@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Sec Auto Clear</title>
+  <link rel="stylesheet" href="popup.css" />
+</head>
+<body>
+  <div class="container">
+    <header>
+      <div class="logo">
+        <div class="logo-icon">🛡️</div>
+        <div>
+          <h1>Sec Auto Clear</h1>
+          <p>Nhẹ • Ổn định • Tự động dọn sạch</p>
+        </div>
+      </div>
+      <label class="switch">
+        <input type="checkbox" id="enabled" />
+        <span class="slider"></span>
+      </label>
+    </header>
+
+    <section class="card">
+      <h2>⏱️ Tần suất dọn dẹp</h2>
+      <select id="interval">
+        <option value="10">Mỗi 10 phút</option>
+        <option value="60">Mỗi 1 giờ</option>
+        <option value="1440">Mỗi 1 ngày</option>
+        <option value="onClose">Khi đóng Chrome</option>
+      </select>
+      <div class="status-grid">
+        <div class="status-item">
+          <span class="label">Lần cuối</span>
+          <span class="value" id="lastCleared">—</span>
+        </div>
+        <div class="status-item">
+          <span class="label">Lần tới</span>
+          <span class="value" id="nextClear">—</span>
+        </div>
+      </div>
+      <div id="countdown" class="countdown"></div>
+    </section>
+
+    <section class="card">
+      <h2>🧹 Dữ liệu sẽ xoá</h2>
+      <div class="checks">
+        <label><input type="checkbox" data-key="cache" /> Cache</label>
+        <label><input type="checkbox" data-key="history" /> Lịch sử duyệt web</label>
+        <label><input type="checkbox" data-key="downloads" /> Lịch sử tải xuống</label>
+        <label><input type="checkbox" data-key="localStorage" /> Local Storage / FileSystems / WebSQL</label>
+        <label><input type="checkbox" data-key="formData" /> Dữ liệu form</label>
+        <label><input type="checkbox" data-key="cacheStorage" /> Cache Storage</label>
+        <label class="sub"><input type="checkbox" data-key="cookies" /> Cookies <span class="hint">(cẩn trọng: sẽ đăng xuất)</span></label>
+        <label class="sub"><input type="checkbox" data-key="indexedDB" /> IndexedDB</label>
+        <label class="sub"><input type="checkbox" data-key="serviceWorkers" /> Service Workers</label>
+      </div>
+      <label class="notify">
+        <input type="checkbox" id="notifyOnClear" /> Hiện thông báo khi đã dọn xong
+      </label>
+    </section>
+
+    <section class="actions">
+      <button id="clearNow" class="btn primary">🧹 Dọn ngay bây giờ</button>
+      <button id="save" class="btn secondary">💾 Lưu cài đặt</button>
+    </section>
+
+    <div id="toast" class="toast hidden"></div>
+
+    <footer>
+      <span>Manifest V3 • dùng chrome.alarms + browsingData</span>
+      <a href="#" id="openHelp">Hướng dẫn</a>
+    </footer>
+  </div>
+
+  <div id="helpModal" class="modal hidden">
+    <div class="modal-content">
+      <h3>Hướng dẫn nhanh</h3>
+      <ul>
+        <li><b>Bật/tắt</b> ở góc trên để tạm dừng mà không mất cấu hình.</li>
+        <li><b>Khi đóng Chrome</b>: extension sẽ dọn khi bạn đóng cửa sổ cuối cùng. Chrome phải được thoát hẳn (không chạy nền).</li>
+        <li>Nếu cần độ sạch tuyệt đối, dùng <b>10 phút</b> hoặc <b>1 giờ</b> thay vì onClose.</li>
+        <li>Mẹo ổn định: chỉ chọn những mục cần thiết (khuyến nghị mặc định 5 mục đầu).</li>
+      </ul>
+      <button id="closeHelp" class="btn secondary">Đóng</button>
+    </div>
+  </div>
+
+  <script src="popup.js"></script>
+</body>
+</html>
