@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+  <!-- This module was also published with a richer model, Gradle metadata,  -->
+  <!-- which should be used instead. Do not delete the following line which  -->
+  <!-- is to indicate to Gradle or any Gradle module metadata file consumer  -->
+  <!-- that they should prefer consuming it instead. -->
+  <!-- do_not_remove: published-with-gradle-metadata -->
+  <modelVersion>4.0.0</modelVersion>
+  <groupId>de.miraculixx</groupId>
+  <artifactId>kpaper</artifactId>
+  <version>1.2.1</version>
+  <name>KPaper</name>
+  <description>A Kotlin API for Minecraft plugins using the Paper toolchain</description>
+  <url>https://github.com/MiraculixxT/KPaper</url>
+  <licenses>
+    <license>
+      <name>GNU General Public License, Version 3</name>
+      <url>https://www.gnu.org/licenses/gpl-3.0.en.html</url>
+    </license>
+  </licenses>
+  <developers>
+    <developer>
+      <name>miraculixx</name>
+    </developer>
+    <developer>
+      <name>jakobkmar</name>
+    </developer>
+  </developers>
+  <scm>
+    <connection>scm:git:git://github.com/MiraculixxT/KPaper.git</connection>
+    <url>https://github.com/MiraculixxT/KPaper</url>
+  </scm>
+  <dependencies>
+    <dependency>
+      <groupId>org.jetbrains.kotlinx</groupId>
+      <artifactId>kotlinx-serialization-json-jvm</artifactId>
+      <version>1.5.1</version>
+      <scope>compile</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.jetbrains.kotlinx</groupId>
+      <artifactId>kotlinx-coroutines-core-jvm</artifactId>
+      <version>1.7.1</version>
+      <scope>compile</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.jetbrains.kotlinx</groupId>
+      <artifactId>kotlinx-coroutines-jdk8</artifactId>
+      <version>1.7.1</version>
+      <scope>compile</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.jetbrains.kotlin</groupId>
+      <artifactId>kotlin-stdlib-jdk8</artifactId>
+      <version>1.8.22</version>
+      <scope>compile</scope>
+    </dependency>
+  </dependencies>
+</project>
