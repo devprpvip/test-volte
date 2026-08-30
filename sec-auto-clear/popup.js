@@ -4,6 +4,7 @@ const $$ = (s) => document.querySelectorAll(s);
 
 let currentSettings = null;
 let countdownTimer = null;
+let saving = false; // chặn lưu/refresh chồng nhau gây ghi đè checkbox
 
 function formatTime(ts) {
   if (!ts) return "—";
@@ -50,7 +51,29 @@ async function send(type, payload) {
   });
 }
 
+// Chỉ cập nhật phần TRẠNG THÁI (lần cuối / lần tới / countdown) — KHÔNG đụng vào form/checkbox
+function updateStatusDisplay(settings, alarm) {
+  $("#lastCleared").textContent = settings.lastCleared ? formatTime(settings.lastCleared) : "Chưa dọn lần nào";
+  if (settings.interval === "onClose") {
+    $("#nextClear").textContent = "Khi đóng Chrome";
+    $("#countdown").textContent = settings.enabled ? "Sẽ dọn khi bạn đóng cửa sổ cuối cùng" : "Đã tắt";
+    clearInterval(countdownTimer);
+  } else {
+    // ưu tiên scheduledTime của alarm thật, fallback nextClear đã lưu
+    let next = settings.nextClear;
+    if (alarm && alarm.scheduledTime) next = alarm.scheduledTime;
+    $("#nextClear").textContent = next ? formatTime(next) : "—";
+    if (!settings.enabled) {
+      $("#countdown").textContent = "Đã tắt";
+      clearInterval(countdownTimer);
+    } else {
+      startCountdown(next);
+    }
+  }
+}
+
 async function load() {
+  if (saving) return; // đang lưu: không được vẽ lại form làm mất toggle của user
   if (load._inFlight) return;
   load._inFlight = true;
   try {
@@ -72,22 +95,7 @@ async function load() {
       cb.checked = !!settings.dataTypes[k];
     });
 
-    $("#lastCleared").textContent = settings.lastCleared ? formatTime(settings.lastCleared) : "Chưa dọn lần nào";
-    if (settings.interval === "onClose") {
-      $("#nextClear").textContent = "Khi đóng Chrome";
-      $("#countdown").textContent = settings.enabled ? "Sẽ dọn khi bạn đóng cửa sổ cuối cùng" : "Đã tắt";
-    } else {
-      // ưu tiên scheduledTime của alarm thật, fallback nextClear đã lưu
-      let next = settings.nextClear;
-      if (alarm && alarm.scheduledTime) next = alarm.scheduledTime;
-      $("#nextClear").textContent = next ? formatTime(next) : "—";
-      if (!settings.enabled) {
-        $("#countdown").textContent = "Đã tắt";
-      } else {
-        startCountdown(next);
-      }
-    }
-
+    updateStatusDisplay(settings, alarm);
     updateEnabledState();
   } finally {
     load._inFlight = false;
@@ -137,33 +145,40 @@ function collectForm() {
 }
 
 async function handleSave(showMsg = true) {
-  const payload = collectForm();
-  // nếu bật notify, cần xin quyền notifications (optional_permissions) bằng user gesture
-  if (payload.notifyOnClear) {
-    try {
-      const has = await chrome.permissions.contains({ permissions: ["notifications"] });
-      if (!has) {
-        const granted = await new Promise((resolve) => {
-          chrome.permissions.request({ permissions: ["notifications"] }, (g) => resolve(g));
-        });
-        if (!granted) {
-          payload.notifyOnClear = false;
-          $("#notifyOnClear").checked = false;
-          showToast("Bạn đã từ chối quyền thông báo", "info");
+  if (saving) return; // đang có lượt lưu chạy: bỏ qua, tránh tick sau ghi đè tick trước
+  saving = true;
+  try {
+    const payload = collectForm();
+    // nếu bật notify, cần xin quyền notifications (optional_permissions) bằng user gesture
+    if (payload.notifyOnClear) {
+      try {
+        const has = await chrome.permissions.contains({ permissions: ["notifications"] });
+        if (!has) {
+          const granted = await new Promise((resolve) => {
+            chrome.permissions.request({ permissions: ["notifications"] }, (g) => resolve(g));
+          });
+          if (!granted) {
+            payload.notifyOnClear = false;
+            $("#notifyOnClear").checked = false;
+            showToast("Bạn đã từ chối quyền thông báo", "info");
+          }
         }
-      }
-    } catch {}
-  }
-  const res = await send("SAVE_SETTINGS", payload);
-  if (res && res.ok) {
-    currentSettings = res.data;
-    if (res.needNotifyPerm) {
-      // background báo cần perm nhưng ta đã handle ở trên
+      } catch {}
     }
-    await load();
-    if (showMsg) showToast("Đã lưu cài đặt ✓", "success");
-  } else {
-    showToast("Lưu thất bại: " + (res?.error || "unknown"), "error");
+    const res = await send("SAVE_SETTINGS", payload);
+    if (res && res.ok) {
+      currentSettings = res.data;
+      // QUAN TRỌNG: chỉ cập nhật phần trạng thái, KHÔNG load() lại toàn form
+      // (load() sẽ vẽ lại checkbox từ storage và có thể chạy trước khi ghi xong → tick bị reset)
+      updateStatusDisplay(res.data, null);
+      updateEnabledState();
+      if (showMsg) showToast("Đã lưu cài đặt ✓", "success");
+    } else {
+      showToast("Lưu thất bại: " + (res?.error || "unknown"), "error");
+      await load(); // khôi phục form theo dữ liệu đã lưu thật
+    }
+  } finally {
+    saving = false;
   }
 }
 
