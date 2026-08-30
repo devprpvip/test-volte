@@ -2,6 +2,82 @@
 // Nhẹ, ổn định, tự lưu vào Chrome profile (không phụ thuộc file gốc sau khi Pack)
 // Hooks đúng theo docs: https://developer.chrome.com/docs/extensions/reference/api/*
 
+const SETTINGS_KEY = "secSettings";
+
+function sameJSON(a, b) {
+  try { return JSON.stringify(a) === JSON.stringify(b); } catch { return false; }
+}
+
+async function getSettings() {
+  let syncData = {};
+  let localData = {};
+  try { syncData = await chrome.storage.sync.get([SETTINGS_KEY]); } catch (e) {}
+  try { localData = await chrome.storage.local.get([SETTINGS_KEY]); } catch (e) {}
+  let src = syncData[SETTINGS_KEY] || localData[SETTINGS_KEY];
+  if (!src) {
+    // seed cả 2 nơi
+    try { await chrome.storage.sync.set({ [SETTINGS_KEY]: DEFAULT_SETTINGS }); } catch (e) {}
+    try { await chrome.storage.local.set({ [SETTINGS_KEY]: DEFAULT_SETTINGS }); } catch (e) {}
+    return { ...DEFAULT_SETTINGS };
+  }
+  const merged = {
+    ...DEFAULT_SETTINGS,
+    ...src,
+    dataTypes: { ...DEFAULT_SETTINGS.dataTypes, ...(src.dataTypes || {}) }
+  };
+  // Nếu sync thiếu nhưng local có (hoặc ngược lại) thì đồng bộ lại để tự hồi phục
+  if (!syncData[SETTINGS_KEY] && localData[SETTINGS_KEY] && !sameJSON(syncData[SETTINGS_KEY], merged)) {
+    try { await chrome.storage.sync.set({ [SETTINGS_KEY]: merged }); } catch {}
+  }
+  if (!localData[SETTINGS_KEY] && syncData[SETTINGS_KEY] && !sameJSON(localData[SETTINGS_KEY], merged)) {
+    try { await chrome.storage.local.set({ [SETTINGS_KEY]: merged }); } catch {}
+  }
+  return merged;
+}
+
+async function saveSettings(patch) {
+  const current = await getSettings();
+  const merged = { ...current, ...patch };
+  if (patch.dataTypes) {
+    merged.dataTypes = { ...current.dataTypes, ...patch.dataTypes };
+  }
+  // Không thay đổi gì thì bỏ qua để tránh ghi storage thừa (quota sync giới hạn số lần ghi)
+  if (sameJSON(current, merged)) return merged;
+  // Lưu vào CẢ hai để bền nhất: sync để theo tài khoản, local để fallback offline/quota
+  try { await chrome.storage.sync.set({ [SETTINGS_KEY]: merged }); } catch (e) {
+    console.warn("[Sec Auto Clear] sync save fail (quota/offline?)", e);
+  }
+  try { await chrome.storage.local.set({ [SETTINGS_KEY]: merged }); } catch (e) {
+    console.warn("[Sec Auto Clear] local save fail", e);
+  }
+  return merged;
+}
+
+// Đồng bộ khi storage thay đổi từ nơi khác (ví dụ popup ghi sync thì local cũng cập nhật)
+try {
+  chrome.storage.onChanged.addListener((changes, area) => {
+    if (changes[SETTINGS_KEY]) {
+      const val = changes[SETTINGS_KEY].newValue;
+      if (!val) return;
+      if (area === "sync") {
+        // chỉ ghi local nếu chưa giống (tránh ghi thừa)
+        chrome.storage.local.get([SETTINGS_KEY]).then((r) => {
+          if (!sameJSON(r[SETTINGS_KEY], val)) {
+            chrome.storage.local.set({ [SETTINGS_KEY]: val }).catch(() => {});
+          }
+        }).catch(() => {});
+      } else if (area === "local") {
+        // tránh vòng lặp: chỉ sync nếu sync đang khác
+        chrome.storage.sync.get([SETTINGS_KEY]).then((r) => {
+          if (!sameJSON(r[SETTINGS_KEY], val)) {
+            chrome.storage.sync.set({ [SETTINGS_KEY]: val }).catch(() => {});
+          }
+        }).catch(() => {});
+      }
+    }
+  });
+} catch {}
+
 const ALARM_NAME = "sec-auto-clear-alarm";
 const DEFAULT_SETTINGS = {
   enabled: true,
@@ -21,74 +97,6 @@ const DEFAULT_SETTINGS = {
   lastCleared: 0,
   nextClear: 0
 };
-
-// ===== Storage helpers - TỰ LƯU VÀO CHROME =====
-// Dùng chrome.storage.sync (đồng bộ theo tài khoản Google, sống sót khi xóa file/cài lại)
-// + chrome.storage.local (backup máy cục bộ, quota lớn hơn)
-// Cả hai đều nằm trong Chrome profile (User Data/Default/...), KHÔNG phải file gốc bạn tải về.
-// Xóa thư mục gốc sau khi đã Pack/cài thì không ảnh hưởng.
-async function getSettings() {
-  let syncData = {};
-  let localData = {};
-  try { syncData = await chrome.storage.sync.get(["secSettings"]); } catch (e) {}
-  try { localData = await chrome.storage.local.get(["secSettings"]); } catch (e) {}
-  let src = syncData.secSettings || localData.secSettings;
-  if (!src) {
-    // seed cả 2 nơi
-    try { await chrome.storage.sync.set({ secSettings: DEFAULT_SETTINGS }); } catch (e) {}
-    try { await chrome.storage.local.set({ secSettings: DEFAULT_SETTINGS }); } catch (e) {}
-    return { ...DEFAULT_SETTINGS };
-  }
-  const merged = {
-    ...DEFAULT_SETTINGS,
-    ...src,
-    dataTypes: { ...DEFAULT_SETTINGS.dataTypes, ...(src.dataTypes || {}) }
-  };
-  // Nếu sync thiếu nhưng local có (hoặc ngược lại) thì đồng bộ lại để tự hồi phục
-  if (!syncData.secSettings && localData.secSettings) {
-    try { await chrome.storage.sync.set({ secSettings: merged }); } catch {}
-  }
-  if (!localData.secSettings && syncData.secSettings) {
-    try { await chrome.storage.local.set({ secSettings: merged }); } catch {}
-  }
-  return merged;
-}
-
-async function saveSettings(patch) {
-  const current = await getSettings();
-  const merged = { ...current, ...patch };
-  if (patch.dataTypes) {
-    merged.dataTypes = { ...current.dataTypes, ...patch.dataTypes };
-  }
-  // Lưu vào CẢ hai để bền nhất: sync để theo tài khoản, local để fallback offline/quota
-  try { await chrome.storage.sync.set({ secSettings: merged }); } catch (e) {
-    console.warn("[Sec Auto Clear] sync save fail (quota/offline?)", e);
-  }
-  try { await chrome.storage.local.set({ secSettings: merged }); } catch (e) {
-    console.warn("[Sec Auto Clear] local save fail", e);
-  }
-  return merged;
-}
-
-// Đồng bộ khi storage thay đổi từ nơi khác (ví dụ popup ghi sync thì local cũng cập nhật)
-try {
-  chrome.storage.onChanged.addListener((changes, area) => {
-    if (changes.secSettings) {
-      const val = changes.secSettings.newValue;
-      if (!val) return;
-      if (area === "sync") {
-        chrome.storage.local.set({ secSettings: val }).catch(()=>{});
-      } else if (area === "local") {
-        // tránh vòng lặp: chỉ sync nếu sync đang khác
-        chrome.storage.sync.get(["secSettings"]).then(r=>{
-          const s = JSON.stringify(r.secSettings);
-          const l = JSON.stringify(val);
-          if (s !== l) chrome.storage.sync.set({ secSettings: val }).catch(()=>{});
-        }).catch(()=>{});
-      }
-    }
-  });
-} catch {}
 
 function buildBrowsingDataOptions(dataTypes) {
   return {
@@ -110,14 +118,7 @@ function buildBrowsingDataOptions(dataTypes) {
 
 let isClearing = false;
 
-async function computeNextClear(interval, from = Date.now()) {
-  if (interval === "onClose") return 0;
-  const mins = parseInt(interval, 10);
-  if (isNaN(mins) || mins <= 0) return 0;
-  return from + mins * 60 * 1000;
-}
-
-async function performClear(reason = "alarm") {
+async function performClear(reason = "alarm", alarmInfo = null) {
   if (isClearing) return { skipped: true, reason: "already_clearing" };
   const settings = await getSettings();
   if (!settings.enabled && reason !== "manual") {
@@ -138,7 +139,26 @@ async function performClear(reason = "alarm") {
       types
     );
     const now = Date.now();
-    const next = await computeNextClear(settings.interval, now);
+    // Tính "lần tới" KHỚP với lịch alarm thật của Chrome:
+    // - alarm: dùng scheduledTime của chính alarm (đã được Chrome đẩy sang chu kỳ kế tiếp)
+    // - manual: GIỮ nguyên lịch alarm, không đẩy hạn dọn ra xa
+    // - startup-fallback/onClose: giữ 0 hoặc theo chu kỳ nếu là định kỳ
+    let next = 0;
+    if (settings.interval !== "onClose") {
+      const mins = parseInt(settings.interval, 10) || 0;
+      if (mins > 0) {
+        if (reason === "alarm" && alarmInfo && alarmInfo.scheduledTime) {
+          next = alarmInfo.scheduledTime + mins * 60 * 1000;
+        } else if (reason === "manual") {
+          try {
+            const a = await chrome.alarms.get(ALARM_NAME);
+            next = a && a.scheduledTime ? a.scheduledTime : now + mins * 60 * 1000;
+          } catch { next = now + mins * 60 * 1000; }
+        } else {
+          next = now + mins * 60 * 1000;
+        }
+      }
+    }
     await saveSettings({ lastCleared: now, nextClear: next });
     console.log(`[Sec Auto Clear] Cleared (${reason}) in ${Date.now() - start}ms`, types);
     if (settings.notifyOnClear) {
@@ -167,7 +187,8 @@ async function performClear(reason = "alarm") {
 // ===== Alarm reconciling =====
 async function reconcileAlarm() {
   const settings = await getSettings();
-  const existing = await chrome.alarms.get(ALARM_NAME);
+  let existing = null;
+  try { existing = await chrome.alarms.get(ALARM_NAME); } catch {}
   if (!settings.enabled || settings.interval === "onClose") {
     if (existing) await chrome.alarms.clear(ALARM_NAME);
     await saveSettings({ nextClear: 0 });
@@ -188,8 +209,6 @@ async function reconcileAlarm() {
   await saveSettings({ nextClear: next });
   console.log(`[Sec Auto Clear] Alarm every ${mins} min, next ${new Date(next).toLocaleString()}`);
 }
-
-async function setupAlarm() { await reconcileAlarm(); }
 
 reconcileAlarm().catch(console.error);
 
@@ -214,10 +233,8 @@ chrome.runtime.onStartup.addListener(async () => {
 
 chrome.alarms.onAlarm.addListener(async (alarm) => {
   if (alarm.name !== ALARM_NAME) return;
-  const settings = await getSettings();
-  const next = alarm.scheduledTime + (alarm.periodInMinutes || parseInt(settings.interval, 10)) * 60 * 1000;
-  await saveSettings({ nextClear: next || (Date.now() + parseInt(settings.interval, 10) * 60 * 1000) });
-  await performClear("alarm");
+  // nextClear được tính lại bên trong performClear từ alarm.scheduledTime
+  await performClear("alarm", alarm);
 });
 
 chrome.windows.onRemoved.addListener(async () => {

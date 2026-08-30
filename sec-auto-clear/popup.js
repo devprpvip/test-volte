@@ -51,37 +51,47 @@ async function send(type, payload) {
 }
 
 async function load() {
-  const res = await send("GET_STATUS");
-  if (!res || !res.ok) {
-    showToast("Không tải được cài đặt", "error");
-    return;
+  if (load._inFlight) return;
+  load._inFlight = true;
+  try {
+    const res = await send("GET_STATUS");
+    if (!res || !res.ok) {
+      showToast("Không tải được cài đặt", "error");
+      return;
+    }
+    const { settings, alarm } = res.data;
+    currentSettings = settings;
+
+    // bind UI
+    $("#enabled").checked = !!settings.enabled;
+    $("#interval").value = settings.interval || "60";
+    $("#notifyOnClear").checked = !!settings.notifyOnClear;
+
+    $$("[data-key]").forEach((cb) => {
+      const k = cb.dataset.key;
+      cb.checked = !!settings.dataTypes[k];
+    });
+
+    $("#lastCleared").textContent = settings.lastCleared ? formatTime(settings.lastCleared) : "Chưa dọn lần nào";
+    if (settings.interval === "onClose") {
+      $("#nextClear").textContent = "Khi đóng Chrome";
+      $("#countdown").textContent = settings.enabled ? "Sẽ dọn khi bạn đóng cửa sổ cuối cùng" : "Đã tắt";
+    } else {
+      // ưu tiên scheduledTime của alarm thật, fallback nextClear đã lưu
+      let next = settings.nextClear;
+      if (alarm && alarm.scheduledTime) next = alarm.scheduledTime;
+      $("#nextClear").textContent = next ? formatTime(next) : "—";
+      if (!settings.enabled) {
+        $("#countdown").textContent = "Đã tắt";
+      } else {
+        startCountdown(next);
+      }
+    }
+
+    updateEnabledState();
+  } finally {
+    load._inFlight = false;
   }
-  const { settings, alarm } = res.data;
-  currentSettings = settings;
-
-  // bind UI
-  $("#enabled").checked = !!settings.enabled;
-  $("#interval").value = settings.interval || "60";
-  $("#notifyOnClear").checked = !!settings.notifyOnClear;
-
-  $$("[data-key]").forEach((cb) => {
-    const k = cb.dataset.key;
-    cb.checked = !!settings.dataTypes[k];
-  });
-
-  $("#lastCleared").textContent = settings.lastCleared ? formatTime(settings.lastCleared) : "Chưa dọn lần nào";
-  if (settings.interval === "onClose") {
-    $("#nextClear").textContent = "Khi đóng Chrome";
-    $("#countdown").textContent = settings.enabled ? "Sẽ dọn khi bạn đóng cửa sổ cuối cùng" : "Đã tắt";
-  } else {
-    // ưu tiên nextClear lưu, fallback từ alarm
-    let next = settings.nextClear;
-    if (alarm && alarm.scheduledTime) next = alarm.scheduledTime;
-    $("#nextClear").textContent = next ? formatTime(next) : "—";
-    startCountdown(next);
-  }
-
-  updateEnabledState();
 }
 
 function startCountdown(nextTs) {
@@ -90,11 +100,16 @@ function startCountdown(nextTs) {
     $("#countdown").textContent = "";
     return;
   }
+  let reloadScheduled = false; // chống spam setTimeout(load) mỗi tick khi countdown về 0
   const tick = () => {
     $("#countdown").textContent = formatCountdown(nextTs);
     if (nextTs - Date.now() <= 0) {
-      // reload sau 1s để cập nhật lastCleared nếu vừa dọn
-      setTimeout(load, 1500);
+      clearInterval(countdownTimer);
+      if (!reloadScheduled) {
+        reloadScheduled = true;
+        // reload sau 1.5s để cập nhật lastCleared nếu vừa dọn
+        setTimeout(load, 1500);
+      }
     }
   };
   tick();
@@ -193,10 +208,14 @@ document.addEventListener("DOMContentLoaded", () => {
   $("#helpModal").addEventListener("click", (e) => {
     if (e.target.id === "helpModal") $("#helpModal").classList.add("hidden");
   });
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape") $("#helpModal").classList.add("hidden");
+  });
 });
 
-// Auto refresh mỗi 30s để cập nhật countdown / nextClear
+// Auto refresh mỗi 30s khi popup đang mở để cập nhật countdown / nextClear
 setInterval(() => {
-  // chỉ refresh nếu popup còn mở và ở chế độ định kỳ
-  if (currentSettings && currentSettings.interval !== "onClose") load();
+  // chỉ refresh nếu tab/popup đang hiển thị và ở chế độ định kỳ đã bật
+  if (document.visibilityState !== "visible") return;
+  if (currentSettings && currentSettings.enabled && currentSettings.interval !== "onClose") load();
 }, 30000);

@@ -42,16 +42,34 @@ def gen_key():
 
 def create_zip():
     # zip toàn bộ file cần thiết, loại trừ pack.py, *.pem, *.crx, _tmp
-    exclude = {"pack.py", "sec-auto-clear.pem", "sec-auto-clear.crx", "_tmp.zip", ".DS_Store"}
+    exclude = {"pack.py", "sec-auto-clear.pem", "sec-auto-clear.crx", "_tmp.zip", ".DS_Store", "README.md"}
     with zipfile.ZipFile(ZIP_TMP, "w", zipfile.ZIP_DEFLATED) as z:
-        for p in EXT_DIR.rglob("*"):
+        for p in sorted(EXT_DIR.rglob("*")):
             if p.is_dir(): continue
             if p.name in exclude: continue
+            if p.suffix in {".pyc", ".pyo", ".crx", ".pem", ".zip"}: continue
             if ".git" in p.parts: continue
+            if "__pycache__" in p.parts: continue
             arc = p.relative_to(EXT_DIR).as_posix()
             z.write(p, arc)
             print(f"  + {arc}")
     print(f"[pack] zip: {ZIP_TMP} ({ZIP_TMP.stat().st_size} bytes)")
+
+def create_webstore_zip():
+    # Zip upload Chrome Web Store (dashboard chỉ nhận .zip, KHÔNG nhận .crx)
+    # Giữ README.md vì store cho phép; loại key/crx/pack script.
+    out = EXT_DIR / "sec-auto-clear-webstore.zip"
+    exclude = {"pack.py", "sec-auto-clear.pem", "sec-auto-clear.crx",
+               "sec-auto-clear-webstore.zip", "_tmp.zip", ".DS_Store"}
+    with zipfile.ZipFile(out, "w", zipfile.ZIP_DEFLATED) as z:
+        for p in sorted(EXT_DIR.rglob("*")):
+            if p.is_dir(): continue
+            if p.name in exclude: continue
+            if p.suffix in {".pyc", ".pyo", ".crx", ".pem", ".zip"}: continue
+            if ".git" in p.parts: continue
+            if "__pycache__" in p.parts: continue
+            z.write(p, p.relative_to(EXT_DIR).as_posix())
+    print(f"[pack] webstore zip: {out} ({out.stat().st_size} bytes) - upload tại https://chrome.google.com/webstore/devconsole")
 
 def make_crx():
     # Đọc private key và tạo public key DER
@@ -135,6 +153,7 @@ if __name__=="__main__":
     gen_key()
     create_zip()
     make_crx()
+    create_webstore_zip()
     # dọn tmp
     try: ZIP_TMP.unlink()
     except: pass

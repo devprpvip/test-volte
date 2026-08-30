@@ -59,6 +59,16 @@ python3 sec-auto-clear/pack.py
 
 ---
 
+## Changelog
+
+### v1.1.0
+- **Fix:** popup không còn spam reload mỗi giây khi countdown về 0 (chỉ reload đúng 1 lần rồi dừng interval)
+- **Fix:** "Lần tới" giờ khớp lịch alarm thật của Chrome — dọn tay không còn đẩy hạn dọn ra xa làm lệch countdown
+- **Optimize:** `saveSettings` bỏ qua ghi storage nếu giá trị không đổi (tiết kiệm quota `storage.sync`, SW wake không còn ghi thừa)
+- **Optimize:** `storage.onChanged` chỉ ghi chéo sync↔local khi giá trị thực sự khác nhau (tránh ping-pong ghi đè)
+- **UI:** hiện "Đã tắt" thay vì countdown khi extension bị tắt; đóng modal Hướng dẫn bằng phím `Esc`; popup tự refresh chỉ chạy khi đang hiển thị
+- **Pack:** `pack.py` loại trừ `__pycache__`/`*.pyc`/`.zip` khỏi CRX
+
 ## Cài đặt nhanh
 
 1. Kéo `sec-auto-clear.crx` vào `chrome://extensions` (Developer mode ON)
