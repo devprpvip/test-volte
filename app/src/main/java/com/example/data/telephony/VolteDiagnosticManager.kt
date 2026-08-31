@@ -480,33 +480,70 @@ class VolteDiagnosticManager(private val context: Context) {
                 activeReason = "VoLTE hiện CHƯA ĐƯỢC BẬT hoặc SIM chưa đăng ký dịch vụ VoLTE với nhà mạng (Viettel, VinaPhone, MobiFone...)."
             }
 
-            // 3. Check Settings Visibility (Hidden toggle detection)
+            // 3. Check Settings Visibility (Hidden toggle detection) — FIX FALSE POSITIVE
+            // Trước đây: Xiaomi/Pixel luôn báo HIDDEN dù Cài đặt đã hiện VoLTE.
+            // Nay: Ưu tiên dữ liệu thực tế từ CarrierConfig + per-SIM, chỉ báo ẩn khi có bằng chứng explicit false.
             val isXiaomi = brandLower.contains("xiaomi") || brandLower.contains("redmi") || brandLower.contains("poco") || manufacturerLower.contains("xiaomi")
             val isPixel = brandLower.contains("google") || manufacturerLower.contains("google")
             val isSamsung = brandLower.contains("samsung") || manufacturerLower.contains("samsung")
 
-            val configHidesToggle = carrierConfig?.let {
-                it.showEnhanced4gLte == false || it.editableEnhanced4gLte == false
-            } ?: false
+            val anySlotVisibleEditable = simSlots.any { it.isEnhanced4gLteVisible == true && it.isEnhanced4gLteEditable == true }
+            val anySlotHidden = simSlots.any { it.isEnhanced4gLteVisible == false || it.isEnhanced4gLteEditable == false }
+            val globalVisible = carrierConfig?.showEnhanced4gLte == true && carrierConfig?.editableEnhanced4gLte == true
+            val globalHidden = carrierConfig?.showEnhanced4gLte == false || carrierConfig?.editableEnhanced4gLte == false
+            val configHidesToggle = globalHidden || anySlotHidden
 
             val visibilityStatus: VisibilityStatus
             val visibilityReason: String
 
-            if (isXiaomi) {
-                visibilityStatus = VisibilityStatus.HIDDEN_BY_OEM
-                visibilityReason = "Trên Xiaomi/Redmi/POCO, hệ thống mặc định BẬT 'Kiểm tra nhà mạng' (Carrier Check), làm ẨN công tắc VoLTE trong Cài đặt SIM đối với nhiều nhà mạng. Bạn chỉ cần gõ mã *#*#86583#*#* để hiện lại ngay!"
-            } else if (isPixel) {
-                visibilityStatus = VisibilityStatus.LOCKED_RESTRICTED
-                visibilityReason = "Trên Google Pixel, tùy chọn VoLTE thường bị Google giới hạn theo vùng/nhà mạng chính thức. Có thể mở khóa qua Shizuku + CarrierConfig override hoặc mã Radio Testing."
-            } else if (configHidesToggle) {
-                visibilityStatus = VisibilityStatus.HIDDEN_BY_CARRIER
-                visibilityReason = "Cấu hình nhà mạng (CarrierConfig) hiện đang khóa hoặc ẩn công tắc 'Cuộc gọi 4G/VoLTE' khỏi menu Cài đặt mạng di động."
-            } else if (isSamsung) {
-                visibilityStatus = VisibilityStatus.VISIBLE
-                visibilityReason = "Trên Samsung, VoLTE thường hiển thị trong 'Cài đặt > Kết nối > Các mạng di động' hoặc tự động bật sẵn khi SIM hỗ trợ."
-            } else {
-                visibilityStatus = VisibilityStatus.VISIBLE
-                visibilityReason = "Tùy chọn VoLTE hiển thị bình thường trong 'Cài đặt > Mạng & Internet / SIM & Mạng di động > Cuộc gọi 4G / Enhanced LTE'."
+            when {
+                anySlotVisibleEditable || globalVisible -> {
+                    visibilityStatus = VisibilityStatus.VISIBLE
+                    visibilityReason = when {
+                        isSamsung -> "Trên Samsung, VoLTE đang hiển thị trong 'Cài đặt > Kết nối > Các mạng di động' (đã xác nhận từ CarrierConfig/SIM: show/enhanced = true)."
+                        isXiaomi -> "Công tắc VoLTE đang hiển thị trong Cài đặt SIM (đã xác nhận: CarrierConfig/SIM báo visible & editable). Không cần mở khóa ẩn."
+                        isPixel -> "VoLTE đang hiển thị trong Cài đặt mạng (đã xác nhận: carrier config cho phép VoLTE tại quốc gia này)."
+                        else -> "Tùy chọn VoLTE hiển thị bình thường trong 'Cài đặt > Mạng & Internet / SIM & Mạng di động > Cuộc gọi 4G / Enhanced LTE' (đã xác nhận từ hệ thống)."
+                    }
+                }
+                configHidesToggle -> {
+                    // Có bằng chứng ẩn explicit từ hệ thống
+                    when {
+                        isXiaomi -> {
+                            visibilityStatus = VisibilityStatus.HIDDEN_BY_OEM
+                            visibilityReason = "Trên Xiaomi/Redmi/POCO, hệ thống đang BẬT 'Kiểm tra nhà mạng' và CarrierConfig/SIM báo ẩn (show_enhanced_4g_lte=false hoặc editable=false). Hãy gõ *#*#86583#*#* để hiện lại."
+                        }
+                        isPixel -> {
+                            visibilityStatus = VisibilityStatus.LOCKED_RESTRICTED
+                            visibilityReason = "Trên Google Pixel, CarrierConfig đang khóa VoLTE theo vùng/nhà mạng (show_enhanced_4g_lte=false). Cần Shizuku + CarrierConfig override để mở."
+                        }
+                        else -> {
+                            visibilityStatus = VisibilityStatus.HIDDEN_BY_CARRIER
+                            visibilityReason = "Cấu hình nhà mạng (CarrierConfig) hiện đang khóa hoặc ẩn công tắc 'Cuộc gọi 4G/VoLTE' khỏi menu Cài đặt (SIM báo hidden)."
+                        }
+                    }
+                }
+                else -> {
+                    // Không có bằng chứng rõ ràng (cả visible lẫn hidden đều null/unknown) → mặc định VISIBLE, đưa hint
+                    when {
+                        isXiaomi -> {
+                            visibilityStatus = VisibilityStatus.VISIBLE
+                            visibilityReason = "Trên Xiaomi/Redmi/POCO thường ẩn VoLTE do Carrier Check, nhưng hiện tại hệ thống chưa báo ẩn (SIM/carrier chưa báo hidden). Nếu bạn không thấy công tắc, hãy thử *#*#86583#*#*."
+                        }
+                        isPixel -> {
+                            visibilityStatus = VisibilityStatus.VISIBLE
+                            visibilityReason = "Trên Google Pixel, VoLTE có thể bị giới hạn theo vùng, nhưng hiện tại hệ thống chưa báo khóa. Nếu không thấy, kiểm tra *#*#4636#*#* hoặc dùng Shizuku."
+                        }
+                        isSamsung -> {
+                            visibilityStatus = VisibilityStatus.VISIBLE
+                            visibilityReason = "Trên Samsung, VoLTE thường hiển thị trong 'Cài đặt > Kết nối > Các mạng di động' hoặc tự động bật sẵn khi SIM hỗ trợ."
+                        }
+                        else -> {
+                            visibilityStatus = VisibilityStatus.VISIBLE
+                            visibilityReason = "Tùy chọn VoLTE hiển thị bình thường trong 'Cài đặt > Mạng & Internet / SIM & Mạng di động > Cuộc gọi 4G / Enhanced LTE'."
+                        }
+                    }
+                }
             }
 
             val overallSummary = when {
