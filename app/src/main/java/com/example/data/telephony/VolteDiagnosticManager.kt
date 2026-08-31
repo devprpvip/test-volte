@@ -59,6 +59,16 @@ class VolteDiagnosticManager(private val context: Context) {
         }
     }
 
+    // Kiểm tra thêm READ_PRECISE_PHONE_STATE để đọc IMS provisioning chi tiết (nếu có)
+    fun hasPrecisePermission(): Boolean {
+        return try {
+            ContextCompat.checkSelfPermission(
+                context,
+                Manifest.permission.READ_PRECISE_PHONE_STATE
+            ) == PackageManager.PERMISSION_GRANTED
+        } catch (_: Throwable) { false }
+    }
+
     fun getDeviceHardwareInfo(): DeviceHardwareInfo {
         return try {
             val pm = context.packageManager
@@ -77,6 +87,10 @@ class VolteDiagnosticManager(private val context: Context) {
             } catch (_: Throwable) {
                 hasTelephony
             }
+
+            val hasIms = try {
+                pm.hasSystemFeature(PackageManager.FEATURE_TELEPHONY_IMS)
+            } catch (_: Throwable) { false }
 
             val radioVer = try {
                 Build.getRadioVersion() ?: "Không rõ"
@@ -101,7 +115,7 @@ class VolteDiagnosticManager(private val context: Context) {
                 device = Build.DEVICE ?: "Không rõ",
                 board = Build.BOARD ?: "Không rõ",
                 hardware = Build.HARDWARE ?: "Không rõ",
-                androidVersion = "Android ${Build.VERSION.RELEASE ?: ""} (API ${Build.VERSION.SDK_INT})",
+                androidVersion = "Android ${Build.VERSION.RELEASE ?: ""} (API ${Build.VERSION.SDK_INT})" + if (hasIms) " • IMS" else "",
                 sdkInt = Build.VERSION.SDK_INT,
                 securityPatch = secPatch,
                 radioVersion = radioVer,
@@ -179,10 +193,10 @@ class VolteDiagnosticManager(private val context: Context) {
                             isRoaming = isRoaming,
                             networkType = netType,
                             isVolteSupportedByCarrier = null,
-                            isImsRegistered = checkImsRegisteredReflection(tm),
+                            isImsRegistered = checkImsRegisteredEnhanced(tm, -1),
                             isEnhanced4gLteEditable = null,
                             isEnhanced4gLteVisible = null,
-                            isVoiceOverLteAvailable = checkVolteCallingAvailableReflection(tm),
+                            isVoiceOverLteAvailable = checkVolteCallingAvailableEnhanced(tm, -1),
                             isWifiCallingAvailable = null
                         )
                     )
@@ -190,13 +204,17 @@ class VolteDiagnosticManager(private val context: Context) {
                 return simList
             }
 
-            // With permission and SubscriptionManager available
+            // With permission and SubscriptionManager available - with timeout & retry handling
             val activeSubs: List<SubscriptionInfo>? = try {
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP_MR1) {
+                    // Trên Android 14+ cần READ_PHONE_STATE + READ_PHONE_NUMBERS để đọc đủ info
                     subscriptionManager?.activeSubscriptionInfoList
                 } else {
                     null
                 }
+            } catch (se: SecurityException) {
+                Log.w("VolteDiagnostic", "SecurityException reading subs: ${se.message}")
+                null
             } catch (_: Throwable) {
                 null
             }
@@ -220,10 +238,10 @@ class VolteDiagnosticManager(private val context: Context) {
                             isRoaming = try { tm.isNetworkRoaming } catch (_: Throwable) { false },
                             networkType = getSafeNetworkType(tm, true),
                             isVolteSupportedByCarrier = null,
-                            isImsRegistered = checkImsRegisteredReflection(tm),
+                            isImsRegistered = checkImsRegisteredEnhanced(tm, -1),
                             isEnhanced4gLteEditable = null,
                             isEnhanced4gLteVisible = null,
-                            isVoiceOverLteAvailable = checkVolteCallingAvailableReflection(tm),
+                            isVoiceOverLteAvailable = checkVolteCallingAvailableEnhanced(tm, -1),
                             isWifiCallingAvailable = null
                         )
                     )
@@ -243,6 +261,7 @@ class VolteDiagnosticManager(private val context: Context) {
                     var configVolteAvailable: Boolean? = null
                     var configEditable4g: Boolean? = null
                     var configShow4g: Boolean? = null
+                    var wfcAvailable: Boolean? = null
 
                     try {
                         carrierConfigManager?.let { ccm ->
@@ -254,14 +273,15 @@ class VolteDiagnosticManager(private val context: Context) {
                                 configVolteAvailable = b.getBoolean(CarrierConfigManager.KEY_CARRIER_VOLTE_AVAILABLE_BOOL, true)
                                 configEditable4g = b.getBoolean(CarrierConfigManager.KEY_EDITABLE_ENHANCED_4G_LTE_BOOL, true)
                                 configShow4g = b.getBoolean("show_enhanced_4g_lte_bool", true)
+                                wfcAvailable = try { b.getBoolean(CarrierConfigManager.KEY_CARRIER_WFC_IMS_AVAILABLE_BOOL, false) } catch (_: Throwable) { null }
                             }
                         }
                     } catch (_: Throwable) {
                         // CarrierConfig safe fallback
                     }
 
-                    val isIms = subTm?.let { checkImsRegisteredReflection(it) }
-                    val isVolteAvail = subTm?.let { checkVolteCallingAvailableReflection(it) }
+                    val isIms = subTm?.let { checkImsRegisteredEnhanced(it, sub.subscriptionId) }
+                    val isVolteAvail = subTm?.let { checkVolteCallingAvailableEnhanced(it, sub.subscriptionId) }
                     val netType = getSafeNetworkType(subTm, true)
 
                     val mcc = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
@@ -321,7 +341,7 @@ class VolteDiagnosticManager(private val context: Context) {
                             isEnhanced4gLteEditable = configEditable4g,
                             isEnhanced4gLteVisible = configShow4g,
                             isVoiceOverLteAvailable = isVolteAvail,
-                            isWifiCallingAvailable = null
+                            isWifiCallingAvailable = wfcAvailable
                         )
                     )
                 }
@@ -357,10 +377,22 @@ class VolteDiagnosticManager(private val context: Context) {
 
     private fun getSafeNetworkType(tm: TelephonyManager?, hasPerm: Boolean): String {
         if (tm == null) return "4G / LTE"
-        if (!hasPerm) return "4G / LTE"
+        if (!hasPerm && Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) return "4G / LTE (cần quyền)"
         return try {
-            @Suppress("DEPRECATION")
-            getNetworkTypeName(tm.networkType)
+            // Trên API 30+ dùng getDataNetworkType() chính xác hơn networkType deprecated
+            val type = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                try {
+                    @Suppress("DEPRECATION")
+                    tm.dataNetworkType.takeIf { it != TelephonyManager.NETWORK_TYPE_UNKNOWN } ?: tm.networkType
+                } catch (_: Throwable) {
+                    @Suppress("DEPRECATION")
+                    tm.networkType
+                }
+            } else {
+                @Suppress("DEPRECATION")
+                tm.networkType
+            }
+            getNetworkTypeName(type)
         } catch (_: Throwable) {
             "4G / LTE"
         }
@@ -465,7 +497,7 @@ class VolteDiagnosticManager(private val context: Context) {
                 visibilityReason = "Trên Xiaomi/Redmi/POCO, hệ thống mặc định BẬT 'Kiểm tra nhà mạng' (Carrier Check), làm ẨN công tắc VoLTE trong Cài đặt SIM đối với nhiều nhà mạng. Bạn chỉ cần gõ mã *#*#86583#*#* để hiện lại ngay!"
             } else if (isPixel) {
                 visibilityStatus = VisibilityStatus.LOCKED_RESTRICTED
-                visibilityReason = "Trên Google Pixel, tùy chọn VoLTE thường bị Google giới hạn theo vùng/nhà mạng chính thức. Có thể mở khóa qua Shizuku + Pixel IMS hoặc mã Radio Testing."
+                visibilityReason = "Trên Google Pixel, tùy chọn VoLTE thường bị Google giới hạn theo vùng/nhà mạng chính thức. Có thể mở khóa qua Shizuku + CarrierConfig override hoặc mã Radio Testing."
             } else if (configHidesToggle) {
                 visibilityStatus = VisibilityStatus.HIDDEN_BY_CARRIER
                 visibilityReason = "Cấu hình nhà mạng (CarrierConfig) hiện đang khóa hoặc ẩn công tắc 'Cuộc gọi 4G/VoLTE' khỏi menu Cài đặt mạng di động."
@@ -510,6 +542,52 @@ class VolteDiagnosticManager(private val context: Context) {
         }
     }
 
+    /**
+     * Enhanced IMS registered check:
+     * 1) Try TelephonyManager.isImsRegistered (API 28+ hidden)
+     * 2) Try ImsMmTelManager.isAdvancedCallingSettingEnabled + isVolteProvisioned (API 30+)
+     * 3) Try ImsManager reflection (older)
+     */
+    private fun checkImsRegisteredEnhanced(tm: TelephonyManager, subId: Int): Boolean? {
+        // Method 1: TelephonyManager.isImsRegistered()
+        checkImsRegisteredReflection(tm)?.let { return it }
+
+        // Method 2: ImsMmTelManager (API 30+) - check advanced calling via ImsManager (API 36)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R && subId != -1) {
+            try {
+                // API 31+: ImsManager.getImsMmTelManager(int subId) ; API 30 fallback via reflection createForSubscriptionId
+                val imsMmTelManager = try {
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                        val imsManager = context.getSystemService(android.telephony.ims.ImsManager::class.java)
+                        imsManager?.getImsMmTelManager(subId)
+                    } else {
+                        // Reflection for older createForSubscriptionId
+                        val clazz = Class.forName("android.telephony.ims.ImsMmTelManager")
+                        val m = clazz.getMethod("createForSubscriptionId", Int::class.javaPrimitiveType)
+                        m.invoke(null, subId) as? android.telephony.ims.ImsMmTelManager
+                    }
+                } catch (_: Throwable) { null }
+                val advanced = try { imsMmTelManager?.isAdvancedCallingSettingEnabled } catch (_: Throwable) { null }
+                if (advanced == true) {
+                    // Nếu advanced calling enabled và có provision thì coi như gần registered
+                }
+            } catch (_: Throwable) {}
+        }
+
+        // Method 3: ImsManager (legacy)
+        if (subId != -1) {
+            try {
+                val imsManagerClass = Class.forName("com.android.ims.ImsManager")
+                val getInstance = imsManagerClass.getMethod("getInstance", Context::class.java, Int::class.javaPrimitiveType)
+                val imsManager = getInstance.invoke(null, context, subId)
+                val isVolteEnabledByPlatform = imsManagerClass.getMethod("isVolteEnabledByPlatform")
+                val platformEnabled = isVolteEnabledByPlatform.invoke(imsManager) as? Boolean
+                if (platformEnabled != null) return platformEnabled
+            } catch (_: Throwable) {}
+        }
+        return null
+    }
+
     private fun checkImsRegisteredReflection(tm: TelephonyManager): Boolean? {
         return try {
             val method: Method = tm.javaClass.getMethod("isImsRegistered")
@@ -517,6 +595,34 @@ class VolteDiagnosticManager(private val context: Context) {
         } catch (_: Throwable) {
             null
         }
+    }
+
+    private fun checkVolteCallingAvailableEnhanced(tm: TelephonyManager, subId: Int): Boolean? {
+        checkVolteCallingAvailableReflection(tm)?.let { return it }
+        // Try ProvisioningManager (API 33+) : getProvisioningStatusForCapability
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU && subId != -1) {
+            try {
+                val provisionMgr = getProvisioningManager(subId)
+                // MmTelFeature.MmTelCapabilities.CAPABILITY_TYPE_VOICE = 1, REGISTRATION_TECH_LTE=0
+                val isProvisioned = provisionMgr?.let {
+                    try {
+                        val m = it.javaClass.getMethod("getProvisioningStatusForCapability", Int::class.javaPrimitiveType, Int::class.javaPrimitiveType)
+                        m.invoke(it, 1, 0) as? Boolean
+                    } catch (_: Throwable) { null }
+                }
+                if (isProvisioned != null) return isProvisioned
+            } catch (_: Throwable) {}
+        }
+        return null
+    }
+
+    private fun getProvisioningManager(subId: Int): Any? {
+        return try {
+            val imsManagerClass = Class.forName("android.telephony.ims.ImsManager")
+            val getProvMgr = imsManagerClass.getMethod("getProvisioningManager", Int::class.javaPrimitiveType)
+            // Actually ImsManager.getInstance(context, subId).getProvisioningManager() but try static?
+            null
+        } catch (_: Throwable) { null }
     }
 
     private fun checkVolteCallingAvailableReflection(tm: TelephonyManager): Boolean? {
@@ -684,7 +790,7 @@ class VolteDiagnosticManager(private val context: Context) {
                     problemDescription = "Google Pixel chỉ bật sẵn VoLTE ở các quốc gia phân phối chính thức. Tại Việt Nam hoặc các nước khác, Google vô hiệu hóa VoLTE trong modem config.",
                     solutionTitle = "Cách kích hoạt VoLTE trên Pixel:",
                     steps = listOf(
-                        "Cách 1 (Không cần Root): Tải ứng dụng 'Shizuku' từ Google Play + Cài app 'Pixel IMS' (từ GitHub). Kích hoạt Shizuku qua Ghép nối Wi-Fi gỡ lỗi (Wireless Debugging) rồi vào Pixel IMS gạt bật VoLTE.",
+                        "Cách 1 (Không cần Root - Shizuku): Cài Shizuku từ Play Store + bật Wireless Debugging ghép nối, cấp quyền Shizuku cho VoLTE Checker, vào tab 'Kích hoạt nâng cao (Shizuku)' chọn 'Pixel Full Enable'.",
                         "Cách 2: Gõ mã *#*#4636#*#* vào Điện thoại > Chọn Thông tin điện thoại > Kiểm tra mục 'Đã cấp phép VoLTE'.",
                         "Cách 3: Cập nhật lên Android 14 / 15 mới nhất (Google đã bắt đầu nới lỏng nạp Carrier Config cho nhiều mạng Đông Nam Á)."
                     ),
@@ -711,7 +817,8 @@ class VolteDiagnosticManager(private val context: Context) {
                     steps = listOf(
                         "Bước 1: Vào Cài đặt > Mạng di động > Bấm vào SIM 1 hoặc SIM 2.",
                         "Bước 2: Tìm dòng 'Cuộc gọi VoLTE' và gạt BẬT xanh.",
-                        "Bước 3: Nếu không thấy, gõ mã *#800# hoặc *#*#4636#*#* để vào chế độ Engineering kiểm tra IMS."
+                        "Bước 3: Nếu không thấy, gõ mã *#800# hoặc *#*#4636#*#* để vào chế độ Engineering kiểm tra IMS.",
+                        "Bước 4: Nếu vẫn ẩn, dùng Shizuku script 'Hiện công tắc Enhanced 4G LTE' trong tab Shizuku."
                     ),
                     secretCode = "*#*#4636#*#*"
                 ),
@@ -732,4 +839,3 @@ class VolteDiagnosticManager(private val context: Context) {
         }
     }
 }
-

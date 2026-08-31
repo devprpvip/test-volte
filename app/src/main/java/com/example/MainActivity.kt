@@ -9,9 +9,11 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.ui.Modifier
+import com.example.data.shizuku.ShizukuManager
 import com.example.ui.screens.MainScreen
 import com.example.ui.theme.MyApplicationTheme
 import com.example.ui.viewmodel.VolteCheckerViewModel
+import org.lsposed.hiddenapibypass.HiddenApiBypass
 
 class MainActivity : ComponentActivity() {
 
@@ -19,6 +21,14 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+
+        // Hidden API bypass for Android P+ (needed for ITelephony reflection via Shizuku)
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.P) {
+            try { HiddenApiBypass.addHiddenApiExemptions("L") } catch (_: Throwable) {}
+        }
+        // Init Shizuku early - Sui init + binder listeners
+        try { ShizukuManager.init(this) } catch (_: Throwable) {}
+
         enableEdgeToEdge()
         setContent {
             MyApplicationTheme {
@@ -30,5 +40,10 @@ class MainActivity : ComponentActivity() {
                 }
             }
         }
+    }
+
+    override fun onDestroy() {
+        super.onDestroy()
+        // Do not destroy Shizuku listeners here - ViewModel keeps observing
     }
 }

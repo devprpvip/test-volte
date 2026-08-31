@@ -117,6 +117,10 @@ dependencies {
   implementation(libs.logging.interceptor)
   implementation(libs.moshi.kotlin)
   implementation(libs.okhttp)
+  // Shizuku - privileged API for VoLTE activation scripts
+  implementation(libs.shizuku.api)
+  implementation(libs.shizuku.provider)
+  implementation(libs.hiddenapibypass)
   // implementation(libs.play.services.location)
   implementation(libs.retrofit)
   testImplementation(libs.androidx.compose.ui.test.junit4)
