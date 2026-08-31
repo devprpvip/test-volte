@@ -21,6 +21,9 @@ import com.example.data.model.SimSlotInfo
 import com.example.data.model.SupportStatus
 import com.example.data.model.VisibilityStatus
 import com.example.data.band.BandCheckManager
+import com.example.data.device.ChipsetDetector
+import com.example.data.device.EngineeringModeLauncher
+import com.example.data.device.HiddenMenuLauncher
 import com.example.data.model.VolteVerdict
 import com.example.data.shizuku.ShizukuManager
 import com.example.data.shizuku.ShizukuPrivilegedOperations
@@ -33,6 +36,10 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+
+enum class SimpleFixStage {
+    IDLE, MTK_TRYING, QC_EFS_WARNING, QC_TRYING_MENU, NEED_SHIZUKU, DONE_SUCCESS
+}
 
 data class VolteCheckerUiState(
     val isLoading: Boolean = true,
@@ -76,8 +83,31 @@ data class VolteCheckerUiState(
     val isRunningShizukuScript: Boolean = false,
     val lastScriptResult: String? = null,
     // Band check
-    val bandResult: BandCheckManager.BandCheckResult? = null
-)
+    val bandResult: BandCheckManager.BandCheckResult? = null,
+    // --- Simple Mode (fork siêu đơn giản) ---
+    val isSimpleMode: Boolean = true,
+    val chipsetInfo: ChipsetDetector.ChipsetInfo = ChipsetDetector.ChipsetInfo(
+        type = ChipsetDetector.ChipsetType.UNKNOWN,
+        label = "Đang nhận diện...",
+        shortLabel = "Unknown"
+    ),
+    val simpleFixStage: SimpleFixStage = SimpleFixStage.IDLE,
+    val hiddenMenuIndex: Int = -1,
+    val showEfsWarning: Boolean = false,
+    val lastMtkLaunchMethod: String? = null
+) {
+    // Derived: 5 mục trạng thái simple mode
+    val simpleIsAllGood: Boolean
+        get() = verdict.deviceSupported == SupportStatus.SUPPORTED &&
+                verdict.isVolteEnabled == ActiveStatus.ACTIVE_REGISTERED &&
+                verdict.settingsVisibility == VisibilityStatus.VISIBLE
+
+    val deviceCode: String
+        get() = "${deviceInfo.manufacturer} ${deviceInfo.model}".trim().ifBlank { deviceInfo.model.ifBlank { "Không rõ" } }
+
+    val cpuLabel: String
+        get() = ChipsetDetector.displayLabel(chipsetInfo)
+}
 
 class VolteCheckerViewModel(application: Application) : AndroidViewModel(application) {
 
@@ -213,12 +243,117 @@ class VolteCheckerViewModel(application: Application) : AndroidViewModel(applica
         }
     }
 
+    // --- Simple Mode helpers ---
+    fun toggleSimpleMode() {
+        _uiState.update { it.copy(isSimpleMode = !it.isSimpleMode) }
+    }
+
+    fun setSimpleMode(enabled: Boolean) {
+        _uiState.update { it.copy(isSimpleMode = enabled) }
+    }
+
+    fun dismissEfsWarning() {
+        _uiState.update { it.copy(showEfsWarning = false, simpleFixStage = SimpleFixStage.IDLE) }
+    }
+
+    fun resetSimpleFix() {
+        _uiState.update { it.copy(simpleFixStage = SimpleFixStage.IDLE, hiddenMenuIndex = -1, showEfsWarning = false, lastMtkLaunchMethod = null) }
+    }
+
+    /**
+     * Flow chính Simple Mode theo yêu cầu:
+     * MTK → auto gọi EngineeringMode
+     * Qualcomm → warning EFS → thử menu ẩn → Shizuku
+     */
+    fun onSimpleFixClicked(context: Context) {
+        val chipset = _uiState.value.chipsetInfo
+        when (chipset.type) {
+            ChipsetDetector.ChipsetType.MEDIATEK -> handleMtkFix(context)
+            ChipsetDetector.ChipsetType.QUALCOMM -> {
+                _uiState.update { it.copy(showEfsWarning = true, simpleFixStage = SimpleFixStage.QC_EFS_WARNING) }
+            }
+            else -> {
+                // Các chip khác đi luồng Qualcomm nhưng không cần cảnh báo EFS quá nặng
+                if (chipset.type == ChipsetDetector.ChipsetType.UNKNOWN) {
+                    // Nếu chưa rõ chip, vẫn thử menu ẩn trước
+                    _uiState.update { it.copy(showEfsWarning = true, simpleFixStage = SimpleFixStage.QC_EFS_WARNING) }
+                } else {
+                    // Exynos / Unisoc / Kirin / Tensor → thử menu ẩn trực tiếp (ít rủi ro EFS)
+                    startHiddenMenuFlow(context, 0)
+                }
+            }
+        }
+    }
+
+    fun confirmEfsWarning(context: Context) {
+        _uiState.update { it.copy(showEfsWarning = false) }
+        startHiddenMenuFlow(context, 0)
+    }
+
+    private fun handleMtkFix(context: Context) {
+        _uiState.update { it.copy(simpleFixStage = SimpleFixStage.MTK_TRYING) }
+        try {
+            val res = EngineeringModeLauncher.openMtkEngineeringMode(context)
+            _uiState.update { it.copy(lastMtkLaunchMethod = res.method, simpleFixStage = if (res.success) SimpleFixStage.DONE_SUCCESS else SimpleFixStage.NEED_SHIZUKU) }
+            if (res.success) {
+                showToast(context, "Đã mở EngineerMode (MTK): vào Telephony → IMS → bật VoLTE / ViLTE")
+            } else {
+                showToast(context, "Không mở được EngineerMode trực tiếp, đã thử mã *#*#3646633#*#*")
+            }
+        } catch (e: Throwable) {
+            _uiState.update { it.copy(simpleFixStage = SimpleFixStage.NEED_SHIZUKU) }
+            showToast(context, "Lỗi MTK EngineerMode: ${e.message}")
+        }
+    }
+
+    private fun startHiddenMenuFlow(context: Context, index: Int) {
+        if (index >= HiddenMenuLauncher.QUALCOMM_SEQUENCE.size) {
+            _uiState.update { it.copy(simpleFixStage = SimpleFixStage.NEED_SHIZUKU, hiddenMenuIndex = -1) }
+            return
+        }
+        _uiState.update { it.copy(simpleFixStage = SimpleFixStage.QC_TRYING_MENU, hiddenMenuIndex = index) }
+        val ok = HiddenMenuLauncher.openByIndex(context, index)
+        if (!ok) {
+            // Thử index kế tiếp ngay
+            startHiddenMenuFlow(context, index + 1)
+        } else {
+            val code = HiddenMenuLauncher.QUALCOMM_SEQUENCE[index]
+            showToast(context, "Đã mở ${code.label}: ${code.code} — kiểm tra có nút VoLTE chưa")
+        }
+    }
+
+    fun onHiddenMenuSuccess(context: Context) {
+        _uiState.update { it.copy(simpleFixStage = SimpleFixStage.DONE_SUCCESS, hiddenMenuIndex = -1) }
+        showToast(context, "Tuyệt vời! VoLTE đã hiện — hoàn tất.")
+    }
+
+    fun onHiddenMenuFailed(context: Context) {
+        val next = _uiState.value.hiddenMenuIndex + 1
+        if (next >= HiddenMenuLauncher.QUALCOMM_SEQUENCE.size) {
+            _uiState.update { it.copy(simpleFixStage = SimpleFixStage.NEED_SHIZUKU, hiddenMenuIndex = -1) }
+            showToast(context, "Đã thử hết menu ẩn, chuyển sang Shizuku + Pixel IMS")
+        } else {
+            startHiddenMenuFlow(context, next)
+        }
+    }
+
+    fun runSimpleShizukuFix() {
+        val subIds = _uiState.value.simSlots.mapNotNull { if (it.subscriptionId != -1) it.subscriptionId else null }.ifEmpty { listOf(0) }
+        val script = VolteActivationScripts.pixelFullEnableScript(subIds)
+        runShizukuScript(script)
+        _uiState.update { it.copy(simpleFixStage = SimpleFixStage.NEED_SHIZUKU) }
+    }
+
     fun loadInitialData() {
         viewModelScope.launch(Dispatchers.IO) {
             _uiState.update { it.copy(isLoading = true) }
             try {
                 // Small delay for smooth animation & data gathering
                 delay(300)
+
+                val chipset = try { ChipsetDetector.detect() } catch (_: Throwable) {
+                    ChipsetDetector.ChipsetInfo(ChipsetDetector.ChipsetType.UNKNOWN, "Không rõ", "Unknown")
+                }
 
                 val hasPerm = try { diagnosticManager.hasPhonePermission() } catch (_: Throwable) { false }
                 val hwInfo = try { diagnosticManager.getDeviceHardwareInfo() } catch (_: Throwable) {
@@ -253,6 +388,7 @@ class VolteCheckerViewModel(application: Application) : AndroidViewModel(applica
                     it.copy(
                         isLoading = false,
                         hasPermission = hasPerm,
+                        chipsetInfo = chipset,
                         deviceInfo = hwInfo,
                         simSlots = sims,
                         carrierConfig = config,

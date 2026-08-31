@@ -9,8 +9,11 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.ui.Modifier
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 import com.example.data.shizuku.ShizukuManager
 import com.example.ui.screens.MainScreen
+import com.example.ui.screens.SimpleModeScreen
 import com.example.ui.theme.MyApplicationTheme
 import com.example.ui.viewmodel.VolteCheckerViewModel
 import org.lsposed.hiddenapibypass.HiddenApiBypass
@@ -36,7 +39,18 @@ class MainActivity : ComponentActivity() {
                     modifier = Modifier.fillMaxSize(),
                     color = MaterialTheme.colorScheme.background
                 ) {
-                    MainScreen(viewModel = viewModel)
+                    val uiState by viewModel.uiState.collectAsState()
+                    if (uiState.isSimpleMode) {
+                        SimpleModeScreen(
+                            viewModel = viewModel,
+                            onSwitchToClassic = { viewModel.setSimpleMode(false) }
+                        )
+                    } else {
+                        // Classic 7-tab mode - giữ nguyên bản gốc, thêm nút quay lại Lite ở TopBar actions
+                        MainScreen(viewModel = viewModel)
+                        // Nút Lite được xử lý trong MainScreen via viewModel callback; nếu cần overlay:
+                        // (không cần thêm gì ở đây, MainScreen đã có toggle qua viewModel)
+                    }
                 }
             }
         }

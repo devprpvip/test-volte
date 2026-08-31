@@ -161,6 +161,17 @@ fun MainScreen(
                     }
                 },
                 actions = {
+                    // Nút quay lại Lite (fork siêu đơn giản)
+                    IconButton(
+                        onClick = { viewModel.setSimpleMode(true) },
+                        modifier = Modifier.testTag("switch_to_lite_button")
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Smartphone,
+                            contentDescription = "Về bản Lite",
+                            tint = VoLtePrimary
+                        )
+                    }
                     IconButton(
                         onClick = { viewModel.loadInitialData() },
                         modifier = Modifier.testTag("refresh_button")
