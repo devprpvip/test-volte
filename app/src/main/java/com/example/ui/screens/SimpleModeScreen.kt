@@ -14,8 +14,10 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.CircleShape
@@ -25,7 +27,6 @@ import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Error
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Memory
-import androidx.compose.material.icons.filled.PhoneAndroid
 import androidx.compose.material.icons.filled.PhoneInTalk
 import androidx.compose.material.icons.filled.Security
 import androidx.compose.material.icons.filled.Settings
@@ -56,6 +57,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.data.device.ChipsetDetector
@@ -83,31 +85,32 @@ fun SimpleModeScreen(
         contract = ActivityResultContracts.RequestPermission()
     ) { granted -> viewModel.onPermissionResult(granted) }
 
-    // EFS Warning Dialog for Qualcomm
     if (uiState.showEfsWarning) {
         AlertDialog(
             onDismissRequest = { viewModel.dismissEfsWarning() },
-            icon = { Icon(Icons.Default.Warning, null, tint = StatusWarning, modifier = Modifier.size(32.dp)) },
-            title = { Text("Cảnh báo phân vùng EFS — Qualcomm", fontWeight = FontWeight.Bold) },
+            icon = { Icon(Icons.Default.Warning, null, tint = StatusWarning, modifier = Modifier.size(28.dp)) },
+            title = { Text("Cảnh báo phân vùng EFS — Qualcomm", fontWeight = FontWeight.Bold, fontSize = 16.sp, maxLines = 2, overflow = TextOverflow.Ellipsis) },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Text(
                         "Thiết bị của bạn dùng chip Qualcomm Snapdragon. Phân vùng EFS chứa IMEI và cấu hình modem.",
-                        style = MaterialTheme.typography.bodyMedium
+                        style = MaterialTheme.typography.bodyMedium,
+                        softWrap = true
                     )
                     Surface(shape = RoundedCornerShape(12.dp), color = StatusWarning.copy(alpha = 0.12f), border = BorderStroke(1.dp, StatusWarning.copy(alpha = 0.3f))) {
                         Text(
                             "⚠ Tuyệt đối KHÔNG can thiệp trực tiếp vào EFS qua setprop / QPST nếu không có backup. App này CHỈ thử mở menu ẩn hệ thống (*#800#, *#*#4636#*#*...) và sau đó dùng Shizuku + Pixel IMS (không chạm EFS thô).",
                             style = MaterialTheme.typography.bodySmall,
+                            softWrap = true,
                             modifier = Modifier.padding(12.dp)
                         )
                     }
-                    Text("Bạn có muốn tiếp tục thử mở menu ẩn không? Nếu menu ẩn không hiện nút VoLTE, app sẽ tự chuyển sang Shizuku (an toàn).", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text("Bạn có muốn tiếp tục thử mở menu ẩn không? Nếu menu ẩn không hiện nút VoLTE, app sẽ tự chuyển sang Shizuku (an toàn).", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, softWrap = true)
                 }
             },
             confirmButton = {
                 Button(onClick = { viewModel.confirmEfsWarning(context) }, colors = ButtonDefaults.buttonColors(containerColor = VoLtePrimary)) {
-                    Text("Đã hiểu, tiếp tục →")
+                    Text("Đã hiểu, tiếp tục →", maxLines = 1)
                 }
             },
             dismissButton = {
@@ -116,42 +119,93 @@ fun SimpleModeScreen(
         )
     }
 
+    // Responsive: dùng padding nhỏ hơn trên mobile hẹp, tránh tràn ngang
     LazyColumn(
-        modifier = modifier.fillMaxSize(),
-        contentPadding = PaddingValues(16.dp),
-        verticalArrangement = Arrangement.spacedBy(14.dp)
+        modifier = modifier
+            .fillMaxSize()
+            .statusBarsPadding()
+            .navigationBarsPadding(),
+        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 12.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
-        // Header: App title + Lite badge + switch
+        // Header: App title + Lite badge + switch - compact cho mobile
         item {
             Card(
-                shape = RoundedCornerShape(28.dp),
+                shape = RoundedCornerShape(20.dp),
                 colors = CardDefaults.cardColors(containerColor = VoLtePrimary),
                 modifier = Modifier.fillMaxWidth()
             ) {
-                Row(modifier = Modifier.fillMaxWidth().padding(18.dp), verticalAlignment = Alignment.CenterVertically) {
-                    Box(modifier = Modifier.size(48.dp).clip(CircleShape).background(Color.White), contentAlignment = Alignment.Center) {
-                        Text("HD", fontWeight = FontWeight.ExtraBold, color = VoLtePrimary, fontSize = 18.sp)
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 12.dp, vertical = 12.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(40.dp)
+                            .clip(CircleShape)
+                            .background(Color.White),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text("HD", fontWeight = FontWeight.ExtraBold, color = VoLtePrimary, fontSize = 15.sp, maxLines = 1)
                     }
-                    Spacer(Modifier.width(14.dp))
-                    Column(modifier = Modifier.weight(1f)) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Text("VoLTE Checker", color = Color.White, fontWeight = FontWeight.ExtraBold, fontSize = 18.sp)
-                            Spacer(Modifier.width(8.dp))
-                            Surface(shape = RoundedCornerShape(999.dp), color = Color.White.copy(alpha = 0.2f), border = BorderStroke(1.dp, Color.White.copy(alpha = 0.3f))) {
-                                Text("LITE 1.0.4", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 10.sp, modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp))
+                    Spacer(Modifier.width(10.dp))
+                    Column(modifier = Modifier.weight(1f, fill = true)) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Text(
+                                "VoLTE Checker",
+                                color = Color.White,
+                                fontWeight = FontWeight.ExtraBold,
+                                fontSize = 15.sp,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                                modifier = Modifier.weight(1f, fill = false)
+                            )
+                            Spacer(Modifier.width(6.dp))
+                            Surface(
+                                shape = RoundedCornerShape(999.dp),
+                                color = Color.White.copy(alpha = 0.2f),
+                                border = BorderStroke(1.dp, Color.White.copy(alpha = 0.3f))
+                            ) {
+                                Text(
+                                    "LITE 1.0.4",
+                                    color = Color.White,
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 9.sp,
+                                    maxLines = 1,
+                                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                                )
                             }
                         }
-                        Text("Bản siêu đơn giản • Tự động nhận diện chipset", color = Color.White.copy(alpha = 0.9f), fontSize = 12.sp, lineHeight = 14.sp)
-                        Text("Fork riêng, không thay thế bản gốc 1.0.4", color = Color.White.copy(alpha = 0.7f), fontSize = 10.sp)
+                        Text(
+                            "Bản siêu đơn giản • Tự động nhận diện chipset",
+                            color = Color.White.copy(alpha = 0.9f),
+                            fontSize = 11.sp,
+                            lineHeight = 13.sp,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            softWrap = true
+                        )
+                        Text(
+                            "Fork riêng, không thay thế bản gốc 1.0.4",
+                            color = Color.White.copy(alpha = 0.7f),
+                            fontSize = 9.sp,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
                     }
-                    IconButton(onClick = onSwitchToClassic) {
-                        Icon(Icons.Default.Settings, null, tint = Color.White, modifier = Modifier.size(22.dp))
+                    IconButton(onClick = onSwitchToClassic, modifier = Modifier.size(32.dp)) {
+                        Icon(Icons.Default.Settings, null, tint = Color.White, modifier = Modifier.size(18.dp))
                     }
                 }
             }
         }
 
-        // Auto chipset banner
+        // Auto chipset banner - stack vertical trên màn hẹp để không tràn
         item {
             val chip = uiState.chipsetInfo
             val isMtk = chip.type == ChipsetDetector.ChipsetType.MEDIATEK
@@ -166,69 +220,153 @@ fun SimpleModeScreen(
                 isQc -> VoLtePrimary.copy(alpha = 0.12f)
                 else -> MaterialTheme.colorScheme.surfaceVariant
             }
-            Card(shape = RoundedCornerShape(20.dp), colors = CardDefaults.cardColors(containerColor = chipBg), border = BorderStroke(1.dp, chipColor.copy(alpha = 0.25f)), modifier = Modifier.fillMaxWidth()) {
-                Row(modifier = Modifier.padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
-                    Box(modifier = Modifier.size(36.dp).clip(CircleShape).background(Color.White), contentAlignment = Alignment.Center) {
-                        Icon(Icons.Default.Memory, null, tint = chipColor, modifier = Modifier.size(20.dp))
+            Card(
+                shape = RoundedCornerShape(16.dp),
+                colors = CardDefaults.cardColors(containerColor = chipBg),
+                border = BorderStroke(1.dp, chipColor.copy(alpha = 0.25f)),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(12.dp),
+                    verticalAlignment = Alignment.Top
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(32.dp)
+                            .clip(CircleShape)
+                            .background(Color.White),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(Icons.Default.Memory, null, tint = chipColor, modifier = Modifier.size(18.dp))
                     }
-                    Spacer(Modifier.width(12.dp))
+                    Spacer(Modifier.width(10.dp))
                     Column(modifier = Modifier.weight(1f)) {
-                        Text("Tự động nhận diện chipset", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold, letterSpacing = 0.8.sp, color = chipColor)
+                        Text(
+                            "Tự động nhận diện chipset",
+                            style = MaterialTheme.typography.labelSmall,
+                            fontWeight = FontWeight.Bold,
+                            letterSpacing = 0.6.sp,
+                            color = chipColor,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
                         Text(
                             when {
                                 isMtk -> "MediaTek (MTK) — sẽ tự mở EngineerMode"
-                                isQc -> "Qualcomm Snapdragon — sẽ cảnh báo EFS → thử menu ẩn"
+                                isQc -> "Qualcomm — cảnh báo EFS → thử menu ẩn"
                                 else -> "${chip.label} — thử menu ẩn → Shizuku"
                             },
                             style = MaterialTheme.typography.bodyMedium,
                             fontWeight = FontWeight.SemiBold,
-                            color = MaterialTheme.colorScheme.onSurface
+                            color = MaterialTheme.colorScheme.onSurface,
+                            softWrap = true,
+                            lineHeight = 16.sp,
+                            fontSize = 13.sp
                         )
-                        Text("Phát hiện: ${uiState.cpuLabel} • ${chip.hardware.ifBlank { chip.board }} • ${chip.socModel.ifBlank { "—" }}", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text(
+                            "Phát hiện: ${uiState.cpuLabel} • ${chip.hardware.ifBlank { chip.board }} • ${chip.socModel.ifBlank { "—" }}",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            softWrap = true,
+                            maxLines = 2,
+                            overflow = TextOverflow.Ellipsis,
+                            fontSize = 10.sp
+                        )
                     }
+                    Spacer(Modifier.width(8.dp))
                     if (uiState.isLoading) {
-                        CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp, color = chipColor)
+                        CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp, color = chipColor)
                     } else {
                         Icon(
                             imageVector = if (isMtk || isQc) Icons.Default.CheckCircle else Icons.Default.Info,
                             contentDescription = null,
                             tint = chipColor,
-                            modifier = Modifier.size(22.dp)
+                            modifier = Modifier.size(20.dp)
                         )
                     }
                 }
             }
         }
 
-        // Permission banner if needed
+        // Permission banner - responsive, nút không tràn
         if (!uiState.hasPermission) {
             item {
-                Card(shape = RoundedCornerShape(20.dp), colors = CardDefaults.cardColors(containerColor = StatusWarning.copy(alpha = 0.12f)), border = BorderStroke(1.dp, StatusWarning.copy(alpha = 0.3f)), modifier = Modifier.fillMaxWidth()) {
-                    Row(modifier = Modifier.padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
-                        Icon(Icons.Default.Security, null, tint = StatusWarning, modifier = Modifier.size(22.dp))
-                        Spacer(Modifier.width(10.dp))
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text("Cấp quyền Điện thoại để đọc SIM & IMS chính xác", fontWeight = FontWeight.Bold, fontSize = 13.sp)
-                            Text("Không cấp quyền vẫn xem được, nhưng kết quả sẽ là giả định.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Card(
+                    shape = RoundedCornerShape(16.dp),
+                    colors = CardDefaults.cardColors(containerColor = StatusWarning.copy(alpha = 0.12f)),
+                    border = BorderStroke(1.dp, StatusWarning.copy(alpha = 0.3f)),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(12.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Row(verticalAlignment = Alignment.Top, modifier = Modifier.fillMaxWidth()) {
+                            Icon(Icons.Default.Security, null, tint = StatusWarning, modifier = Modifier.size(20.dp))
+                            Spacer(Modifier.width(8.dp))
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    "Cấp quyền Điện thoại để đọc SIM & IMS chính xác",
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 12.sp,
+                                    softWrap = true,
+                                    lineHeight = 15.sp
+                                )
+                                Text(
+                                    "Không cấp quyền vẫn xem được, nhưng kết quả sẽ là giả định.",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    softWrap = true,
+                                    fontSize = 11.sp
+                                )
+                            }
                         }
-                        Button(onClick = { permissionLauncher.launch(Manifest.permission.READ_PHONE_STATE) }, shape = RoundedCornerShape(20.dp), colors = ButtonDefaults.buttonColors(containerColor = StatusWarning), contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp)) {
-                            Text("Cấp quyền", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                        Button(
+                            onClick = { permissionLauncher.launch(Manifest.permission.READ_PHONE_STATE) },
+                            shape = RoundedCornerShape(20.dp),
+                            colors = ButtonDefaults.buttonColors(containerColor = StatusWarning),
+                            contentPadding = PaddingValues(horizontal = 14.dp, vertical = 6.dp),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Text("Cấp quyền", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Color.White, maxLines = 1)
                         }
                     }
                 }
             }
         }
 
-        // 5-item status table (yêu cầu: 1-2-3 giống bản gốc + 4 mã máy + 5 loại CPU)
+        // 5-item status table
         item {
-            Card(shape = RoundedCornerShape(24.dp), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface), border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline), modifier = Modifier.fillMaxWidth()) {
-                Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(Icons.Default.PhoneInTalk, null, tint = VoLtePrimary, modifier = Modifier.size(20.dp))
+            Card(
+                shape = RoundedCornerShape(16.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(12.dp),
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+                        Icon(Icons.Default.PhoneInTalk, null, tint = VoLtePrimary, modifier = Modifier.size(18.dp))
                         Spacer(Modifier.width(8.dp))
-                        Text("BẢNG TRẠNG THÁI — 5 MỤC", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.ExtraBold, letterSpacing = 0.5.sp)
+                        Text(
+                            "BẢNG TRẠNG THÁI — 5 MỤC",
+                            style = MaterialTheme.typography.titleSmall,
+                            fontWeight = FontWeight.ExtraBold,
+                            letterSpacing = 0.4.sp,
+                            fontSize = 12.sp,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.weight(1f)
+                        )
                     }
-                    // 1 - Device supported
                     SimpleRow(
                         number = "1",
                         icon = when (uiState.verdict.deviceSupported) {
@@ -250,7 +388,6 @@ fun SimpleModeScreen(
                         },
                         subtitle = uiState.verdict.deviceSupportReason
                     )
-                    // 2 - VoLTE enabled
                     SimpleRow(
                         number = "2",
                         icon = when (uiState.verdict.isVolteEnabled) {
@@ -265,7 +402,7 @@ fun SimpleModeScreen(
                         },
                         title = "VoLTE đã bật chưa?",
                         value = when (uiState.verdict.isVolteEnabled) {
-                            ActiveStatus.ACTIVE_REGISTERED -> "Đang hoạt động (IMS Registered) ✅"
+                            ActiveStatus.ACTIVE_REGISTERED -> "Đang hoạt động (IMS Registered)"
                             ActiveStatus.PROVISIONED_READY -> "Đã cấp phép / Sẵn sàng"
                             ActiveStatus.DISABLED -> "Chưa bật / Chưa đăng ký"
                             ActiveStatus.NOT_PROVISIONED -> "Chưa cấp phép"
@@ -273,14 +410,13 @@ fun SimpleModeScreen(
                         },
                         subtitle = uiState.verdict.enabledStatusReason
                     )
-                    // 3 - Settings visibility
                     SimpleRow(
                         number = "3",
                         icon = if (uiState.verdict.settingsVisibility == VisibilityStatus.VISIBLE) Icons.Default.Visibility else Icons.Default.VisibilityOff,
                         color = if (uiState.verdict.settingsVisibility == VisibilityStatus.VISIBLE) StatusSuccess else StatusWarning,
                         title = "Nút VoLTE trong Cài đặt",
                         value = when (uiState.verdict.settingsVisibility) {
-                            VisibilityStatus.VISIBLE -> "Đang hiện (không ẩn) ✅"
+                            VisibilityStatus.VISIBLE -> "Đang hiện (không ẩn)"
                             VisibilityStatus.HIDDEN_BY_OEM -> "BỊ ẨN do khóa hãng"
                             VisibilityStatus.HIDDEN_BY_CARRIER -> "BỊ ẨN bởi nhà mạng"
                             VisibilityStatus.LOCKED_RESTRICTED -> "Bị giới hạn vùng / cần mở khóa"
@@ -288,16 +424,14 @@ fun SimpleModeScreen(
                         },
                         subtitle = uiState.verdict.visibilityReason
                     )
-                    // 4 - Device code
                     SimpleRow(
                         number = "4",
                         icon = Icons.Default.Smartphone,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         title = "Mã máy",
-                        value = "${uiState.deviceInfo.manufacturer} ${uiState.deviceInfo.model} • ${uiState.deviceInfo.brand} • ${uiState.deviceInfo.device}",
+                        value = "${uiState.deviceInfo.manufacturer} ${uiState.deviceInfo.model} • ${uiState.deviceInfo.brand}",
                         subtitle = "Board: ${uiState.deviceInfo.board} • HW: ${uiState.deviceInfo.hardware} • ${uiState.deviceInfo.androidVersion}"
                     )
-                    // 5 - CPU type
                     SimpleRow(
                         number = "5",
                         icon = Icons.Default.Memory,
@@ -308,84 +442,144 @@ fun SimpleModeScreen(
                         },
                         title = "Loại CPU",
                         value = "${uiState.chipsetInfo.shortLabel} — ${uiState.cpuLabel}",
-                        subtitle = "SoC: ${uiState.chipsetInfo.socModel.ifBlank { uiState.chipsetInfo.hardware.ifBlank { "—" }}} • Nhà SX SoC: ${uiState.chipsetInfo.socManufacturer.ifBlank { "—" }} • Platform: ${uiState.chipsetInfo.platform.ifBlank { "—" }}"
+                        subtitle = "SoC: ${uiState.chipsetInfo.socModel.ifBlank { uiState.chipsetInfo.hardware.ifBlank { "—" }}} • Platform: ${uiState.chipsetInfo.platform.ifBlank { "—" }}"
                     )
                 }
             }
         }
 
-        // Overall verdict banner
+        // Overall verdict banner - compact, wrap
         item {
             val allGood = uiState.simpleIsAllGood
             Card(
-                shape = RoundedCornerShape(24.dp),
+                shape = RoundedCornerShape(16.dp),
                 colors = CardDefaults.cardColors(containerColor = if (allGood) StatusSuccess.copy(alpha = 0.12f) else StatusWarning.copy(alpha = 0.14f)),
                 border = BorderStroke(1.dp, if (allGood) StatusSuccess.copy(alpha = 0.35f) else StatusWarning.copy(alpha = 0.35f)),
                 modifier = Modifier.fillMaxWidth()
             ) {
-                Row(modifier = Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
-                    Box(modifier = Modifier.size(40.dp).clip(CircleShape).background(if (allGood) StatusSuccess else StatusWarning), contentAlignment = Alignment.Center) {
-                        Icon(if (allGood) Icons.Default.CheckCircle else Icons.Default.Warning, null, tint = Color.White, modifier = Modifier.size(24.dp))
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(12.dp),
+                    verticalAlignment = Alignment.Top
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(36.dp)
+                            .clip(CircleShape)
+                            .background(if (allGood) StatusSuccess else StatusWarning),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(if (allGood) Icons.Default.CheckCircle else Icons.Default.Warning, null, tint = Color.White, modifier = Modifier.size(20.dp))
                     }
-                    Spacer(Modifier.width(12.dp))
+                    Spacer(Modifier.width(10.dp))
                     Column(modifier = Modifier.weight(1f)) {
-                        Text(if (allGood) "Tất cả đã hoàn tất ✅" else "Cần xử lý để bật VoLTE", fontWeight = FontWeight.ExtraBold, fontSize = 16.sp, color = if (allGood) StatusSuccess else StatusWarning)
-                        Text(uiState.verdict.overallSummary, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, lineHeight = 16.sp)
+                        Text(
+                            if (allGood) "Tất cả đã hoàn tất" else "Cần xử lý để bật VoLTE",
+                            fontWeight = FontWeight.ExtraBold,
+                            fontSize = 14.sp,
+                            color = if (allGood) StatusSuccess else StatusWarning,
+                            softWrap = true,
+                            maxLines = 2,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                        Text(
+                            uiState.verdict.overallSummary,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            lineHeight = 15.sp,
+                            softWrap = true,
+                            fontSize = 11.sp
+                        )
                     }
                 }
             }
         }
 
-        // Main action button
+        // Main action button - responsive
         item {
             val allGood = uiState.simpleIsAllGood
             when (uiState.simpleFixStage) {
                 SimpleFixStage.DONE_SUCCESS -> {
-                    Card(shape = RoundedCornerShape(24.dp), colors = CardDefaults.cardColors(containerColor = StatusSuccess), modifier = Modifier.fillMaxWidth()) {
-                        Row(modifier = Modifier.fillMaxWidth().padding(18.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.Center) {
-                            Icon(Icons.Default.CheckCircle, null, tint = Color.White, modifier = Modifier.size(24.dp))
-                            Spacer(Modifier.width(10.dp))
-                            Text("Hoàn tất — VoLTE đã sẵn sàng!", color = Color.White, fontWeight = FontWeight.ExtraBold, fontSize = 16.sp)
+                    Card(shape = RoundedCornerShape(16.dp), colors = CardDefaults.cardColors(containerColor = StatusSuccess), modifier = Modifier.fillMaxWidth()) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(14.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.Center
+                        ) {
+                            Icon(Icons.Default.CheckCircle, null, tint = Color.White, modifier = Modifier.size(20.dp))
+                            Spacer(Modifier.width(8.dp))
+                            Text("Hoàn tất — VoLTE đã sẵn sàng!", color = Color.White, fontWeight = FontWeight.ExtraBold, fontSize = 13.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
                         }
                     }
-                    OutlinedButton(onClick = { viewModel.resetSimpleFix(); viewModel.loadInitialData() }, shape = RoundedCornerShape(20.dp), modifier = Modifier.fillMaxWidth().padding(top = 8.dp)) {
-                        Text("Kiểm tra lại")
+                    OutlinedButton(
+                        onClick = { viewModel.resetSimpleFix(); viewModel.loadInitialData() },
+                        shape = RoundedCornerShape(20.dp),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(top = 6.dp)
+                    ) {
+                        Text("Kiểm tra lại", maxLines = 1)
                     }
                 }
                 else -> {
                     if (allGood) {
                         Button(
                             onClick = { viewModel.resetSimpleFix() },
-                            shape = RoundedCornerShape(24.dp),
+                            shape = RoundedCornerShape(16.dp),
                             colors = ButtonDefaults.buttonColors(containerColor = StatusSuccess),
-                            modifier = Modifier.fillMaxWidth().height(56.dp)
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(48.dp)
                         ) {
-                            Icon(Icons.Default.CheckCircle, null, modifier = Modifier.size(20.dp))
-                            Spacer(Modifier.width(8.dp))
-                            Text("Tất cả đã hoàn tất ✓", fontWeight = FontWeight.ExtraBold, fontSize = 16.sp)
+                            Icon(Icons.Default.CheckCircle, null, modifier = Modifier.size(18.dp))
+                            Spacer(Modifier.width(6.dp))
+                            Text("Tất cả đã hoàn tất ✓", fontWeight = FontWeight.ExtraBold, fontSize = 14.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
                         }
-                        Text("Không cần thao tác thêm. Nếu muốn thử lại luồng sửa, nhấn “Sửa ngay” bên dưới.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 6.dp))
-                        OutlinedButton(onClick = { viewModel.onSimpleFixClicked(context) }, shape = RoundedCornerShape(20.dp), modifier = Modifier.fillMaxWidth()) {
-                            Text("Thử luồng sửa (demo) →")
+                        Text(
+                            "Không cần thao tác thêm. Nếu muốn thử lại luồng sửa, nhấn “Sửa ngay” bên dưới.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            softWrap = true,
+                            fontSize = 11.sp,
+                            modifier = Modifier.padding(top = 6.dp)
+                        )
+                        OutlinedButton(
+                            onClick = { viewModel.onSimpleFixClicked(context) },
+                            shape = RoundedCornerShape(16.dp),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Text("Thử luồng sửa (demo) →", maxLines = 1)
                         }
                     } else {
                         Button(
                             onClick = { viewModel.onSimpleFixClicked(context) },
-                            shape = RoundedCornerShape(24.dp),
+                            shape = RoundedCornerShape(16.dp),
                             colors = ButtonDefaults.buttonColors(containerColor = VoLtePrimary),
-                            modifier = Modifier.fillMaxWidth().height(56.dp)
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(48.dp)
                         ) {
-                            Icon(Icons.Default.PhoneInTalk, null, modifier = Modifier.size(20.dp))
-                            Spacer(Modifier.width(8.dp))
-                            Text("Sửa ngay →", fontWeight = FontWeight.ExtraBold, fontSize = 18.sp)
+                            Icon(Icons.Default.PhoneInTalk, null, modifier = Modifier.size(18.dp))
+                            Spacer(Modifier.width(6.dp))
+                            Text("Sửa ngay →", fontWeight = FontWeight.ExtraBold, fontSize = 16.sp, maxLines = 1)
                         }
-                        // Hint per chipset
                         val hint = when (uiState.chipsetInfo.type) {
                             ChipsetDetector.ChipsetType.MEDIATEK -> "Nhấn để tự động mở EngineerMode (MTK) và bật VoLTE trực tiếp."
                             ChipsetDetector.ChipsetType.QUALCOMM -> "Nhấn để hiện cảnh báo EFS → thử menu ẩn (*#800#, *#*#4636#*#*...) → nếu không được sẽ dùng Shizuku."
                             else -> "Nhấn để thử menu ẩn trước, nếu không được sẽ chuyển sang Shizuku + Pixel IMS."
                         }
-                        Text(hint, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 6.dp))
+                        Text(
+                            hint,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            softWrap = true,
+                            fontSize = 11.sp,
+                            lineHeight = 14.sp,
+                            modifier = Modifier.padding(top = 6.dp)
+                        )
                     }
                 }
             }
@@ -394,23 +588,31 @@ fun SimpleModeScreen(
         // Stage: MTK trying
         if (uiState.simpleFixStage == SimpleFixStage.MTK_TRYING || (uiState.simpleFixStage == SimpleFixStage.DONE_SUCCESS && uiState.chipsetInfo.type == ChipsetDetector.ChipsetType.MEDIATEK && uiState.lastMtkLaunchMethod != null)) {
             item {
-                Card(shape = RoundedCornerShape(20.dp), colors = CardDefaults.cardColors(containerColor = StatusSuccess.copy(alpha = 0.10f)), border = BorderStroke(1.dp, StatusSuccess.copy(alpha = 0.25f)), modifier = Modifier.fillMaxWidth()) {
-                    Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Icon(Icons.Default.Memory, null, tint = StatusSuccess, modifier = Modifier.size(20.dp))
+                Card(
+                    shape = RoundedCornerShape(16.dp),
+                    colors = CardDefaults.cardColors(containerColor = StatusSuccess.copy(alpha = 0.10f)),
+                    border = BorderStroke(1.dp, StatusSuccess.copy(alpha = 0.25f)),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+                            Icon(Icons.Default.Memory, null, tint = StatusSuccess, modifier = Modifier.size(18.dp))
                             Spacer(Modifier.width(8.dp))
-                            Text("MTK EngineerMode", fontWeight = FontWeight.Bold, color = StatusSuccess)
+                            Text("MTK EngineerMode", fontWeight = FontWeight.Bold, color = StatusSuccess, fontSize = 13.sp, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
                         }
                         Text(
                             if (uiState.simpleFixStage == SimpleFixStage.DONE_SUCCESS) "Đã gửi lệnh mở EngineerMode qua: ${uiState.lastMtkLaunchMethod}. Trong EngineerMode: vào Telephony → IMS → bật VoLTE / ViLTE / VoWiFi → Reboot."
                             else "Đang thử mở EngineerMode… Phương thức: ${uiState.lastMtkLaunchMethod ?: "đang chọn"}",
-                            style = MaterialTheme.typography.bodySmall, lineHeight = 17.sp
+                            style = MaterialTheme.typography.bodySmall,
+                            lineHeight = 16.sp,
+                            softWrap = true,
+                            fontSize = 11.sp
                         )
                         if (uiState.simpleFixStage != SimpleFixStage.DONE_SUCCESS) {
                             Row(verticalAlignment = Alignment.CenterVertically) {
-                                CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp, color = StatusSuccess)
+                                CircularProgressIndicator(modifier = Modifier.size(14.dp), strokeWidth = 2.dp, color = StatusSuccess)
                                 Spacer(Modifier.width(8.dp))
-                                Text("Đang mở…", style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.SemiBold)
+                                Text("Đang mở…", style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.SemiBold, fontSize = 11.sp)
                             }
                         }
                     }
@@ -423,32 +625,61 @@ fun SimpleModeScreen(
             item {
                 val idx = uiState.hiddenMenuIndex.coerceIn(0, HiddenMenuLauncher.QUALCOMM_SEQUENCE.size - 1)
                 val code = HiddenMenuLauncher.QUALCOMM_SEQUENCE.getOrNull(idx)
-                Card(shape = RoundedCornerShape(20.dp), colors = CardDefaults.cardColors(containerColor = VoLtePrimary.copy(alpha = 0.08f)), border = BorderStroke(1.dp, VoLtePrimary.copy(alpha = 0.25f)), modifier = Modifier.fillMaxWidth()) {
-                    Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp, color = VoLtePrimary)
+                Card(
+                    shape = RoundedCornerShape(16.dp),
+                    colors = CardDefaults.cardColors(containerColor = VoLtePrimary.copy(alpha = 0.08f)),
+                    border = BorderStroke(1.dp, VoLtePrimary.copy(alpha = 0.25f)),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+                            CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp, color = VoLtePrimary)
                             Spacer(Modifier.width(8.dp))
-                            Text("Đang thử menu ẩn ${idx + 1}/${HiddenMenuLauncher.QUALCOMM_SEQUENCE.size}", fontWeight = FontWeight.Bold, color = VoLtePrimary)
+                            Text(
+                                "Đang thử menu ẩn ${idx + 1}/${HiddenMenuLauncher.QUALCOMM_SEQUENCE.size}",
+                                fontWeight = FontWeight.Bold,
+                                color = VoLtePrimary,
+                                fontSize = 12.sp,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                                modifier = Modifier.weight(1f)
+                            )
                         }
                         if (code != null) {
-                            Surface(shape = RoundedCornerShape(12.dp), color = MaterialTheme.colorScheme.surface, border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline)) {
-                                Column(modifier = Modifier.padding(12.dp)) {
-                                    Text(code.code, fontWeight = FontWeight.ExtraBold, fontSize = 16.sp, color = VoLtePrimary)
-                                    Text(code.label + " • " + code.target, style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.SemiBold)
-                                    Text(code.description, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, lineHeight = 15.sp)
+                            Surface(
+                                shape = RoundedCornerShape(12.dp),
+                                color = MaterialTheme.colorScheme.surface,
+                                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Column(modifier = Modifier.padding(10.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                                    Text(code.code, fontWeight = FontWeight.ExtraBold, fontSize = 14.sp, color = VoLtePrimary, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                    Text(code.label + " • " + code.target, style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.SemiBold, softWrap = true, fontSize = 11.sp, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                                    Text(code.description, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, lineHeight = 14.sp, softWrap = true, fontSize = 11.sp)
                                 }
                             }
-                            Text("Đã mở bàn phím quay số với mã trên. Hãy kiểm tra xem có nút “VoLTE / Cuộc gọi 4G / Enhanced 4G LTE” hiện ra không.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Text(
+                                "Đã mở bàn phím quay số với mã trên. Hãy kiểm tra xem có nút “VoLTE / Cuộc gọi 4G / Enhanced 4G LTE” hiện ra không.",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                softWrap = true,
+                                fontSize = 11.sp
+                            )
                             Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
-                                Button(onClick = { viewModel.onHiddenMenuSuccess(context) }, shape = RoundedCornerShape(20.dp), colors = ButtonDefaults.buttonColors(containerColor = StatusSuccess), modifier = Modifier.weight(1f)) {
-                                    Icon(Icons.Default.CheckCircle, null, modifier = Modifier.size(16.dp))
-                                    Spacer(Modifier.width(6.dp))
-                                    Text("Có, đã thấy ✓", fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                                Button(
+                                    onClick = { viewModel.onHiddenMenuSuccess(context) },
+                                    shape = RoundedCornerShape(20.dp),
+                                    colors = ButtonDefaults.buttonColors(containerColor = StatusSuccess),
+                                    modifier = Modifier.weight(1f)
+                                ) {
+                                    Text("Có, đã thấy", fontWeight = FontWeight.Bold, fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
                                 }
-                                OutlinedButton(onClick = { viewModel.onHiddenMenuFailed(context) }, shape = RoundedCornerShape(20.dp), modifier = Modifier.weight(1f)) {
-                                    Icon(Icons.Default.VisibilityOff, null, modifier = Modifier.size(16.dp))
-                                    Spacer(Modifier.width(6.dp))
-                                    Text("Chưa thấy", fontSize = 13.sp)
+                                OutlinedButton(
+                                    onClick = { viewModel.onHiddenMenuFailed(context) },
+                                    shape = RoundedCornerShape(20.dp),
+                                    modifier = Modifier.weight(1f)
+                                ) {
+                                    Text("Chưa thấy", fontSize = 12.sp, maxLines = 1)
                                 }
                             }
                         }
@@ -460,62 +691,85 @@ fun SimpleModeScreen(
         // Stage: Need Shizuku
         if (uiState.simpleFixStage == SimpleFixStage.NEED_SHIZUKU) {
             item {
-                Card(shape = RoundedCornerShape(20.dp), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface), border = BorderStroke(1.dp, VoLtePrimary.copy(alpha = 0.25f)), modifier = Modifier.fillMaxWidth()) {
-                    Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Icon(Icons.Default.Security, null, tint = VoLtePrimary, modifier = Modifier.size(22.dp))
+                Card(
+                    shape = RoundedCornerShape(16.dp),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                    border = BorderStroke(1.dp, VoLtePrimary.copy(alpha = 0.25f)),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+                            Icon(Icons.Default.Security, null, tint = VoLtePrimary, modifier = Modifier.size(20.dp))
                             Spacer(Modifier.width(8.dp))
-                            Text("Cần Shizuku + Pixel IMS", fontWeight = FontWeight.ExtraBold, fontSize = 15.sp, color = VoLtePrimary)
+                            Text("Cần Shizuku + Pixel IMS", fontWeight = FontWeight.ExtraBold, fontSize = 13.sp, color = VoLtePrimary, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
                         }
-                        Text("Đã thử hết menu ẩn mà vẫn chưa hiện nút VoLTE. Bước tiếp theo sẽ dùng Shizuku để override CarrierConfig và bật IMS provisioning (persistent, không mất sau reboot).", style = MaterialTheme.typography.bodyMedium, lineHeight = 18.sp)
-                        Surface(shape = RoundedCornerShape(12.dp), color = VoLtePrimary.copy(alpha = 0.08f)) {
-                            Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                                Text("Tự động theo mã máy:", fontWeight = FontWeight.Bold, fontSize = 12.sp)
-                                Text("• Mã máy: ${uiState.deviceCode}", style = MaterialTheme.typography.bodySmall)
-                                Text("• Chip: ${uiState.cpuLabel}", style = MaterialTheme.typography.bodySmall)
-                                Text("• SIM: ${uiState.simSlots.firstOrNull()?.carrierName ?: "—"} • subId=${uiState.simSlots.firstOrNull()?.subscriptionId ?: 0}", style = MaterialTheme.typography.bodySmall)
-                                Text("• Script: Pixel Full Enable (VoLTE+VoWiFi+VoNR+Vt) + IMS provisioning", style = MaterialTheme.typography.bodySmall, color = VoLtePrimary, fontWeight = FontWeight.SemiBold)
+                        Text(
+                            "Đã thử hết menu ẩn mà vẫn chưa hiện nút VoLTE. Bước tiếp theo sẽ dùng Shizuku để override CarrierConfig và bật IMS provisioning (persistent, không mất sau reboot).",
+                            style = MaterialTheme.typography.bodySmall,
+                            lineHeight = 16.sp,
+                            softWrap = true,
+                            fontSize = 11.sp
+                        )
+                        Surface(shape = RoundedCornerShape(12.dp), color = VoLtePrimary.copy(alpha = 0.08f), modifier = Modifier.fillMaxWidth()) {
+                            Column(modifier = Modifier.padding(10.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                                Text("Tự động theo mã máy:", fontWeight = FontWeight.Bold, fontSize = 11.sp, maxLines = 1)
+                                Text("• Mã máy: ${uiState.deviceCode}", style = MaterialTheme.typography.bodySmall, softWrap = true, fontSize = 11.sp, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                                Text("• Chip: ${uiState.cpuLabel}", style = MaterialTheme.typography.bodySmall, softWrap = true, fontSize = 11.sp, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                                Text("• SIM: ${uiState.simSlots.firstOrNull()?.carrierName ?: "—"} • subId=${uiState.simSlots.firstOrNull()?.subscriptionId ?: 0}", style = MaterialTheme.typography.bodySmall, softWrap = true, fontSize = 11.sp)
+                                Text("• Script: Pixel Full Enable (VoLTE+VoWiFi+VoNR+Vt) + IMS provisioning", style = MaterialTheme.typography.bodySmall, color = VoLtePrimary, fontWeight = FontWeight.SemiBold, softWrap = true, fontSize = 11.sp)
                             }
                         }
                         val shizukuReady = uiState.shizukuState is com.example.data.shizuku.ShizukuManager.ShizukuState.ReadyShell || uiState.shizukuState is com.example.data.shizuku.ShizukuManager.ShizukuState.ReadyRoot
                         if (!shizukuReady) {
-                            Surface(shape = RoundedCornerShape(12.dp), color = StatusWarning.copy(alpha = 0.12f), border = BorderStroke(1.dp, StatusWarning.copy(alpha = 0.3f))) {
-                                Text("Shizuku chưa sẵn sàng (${uiState.shizukuState}). Cần cài Shizuku và cấp quyền trước khi chạy.", style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(12.dp))
+                            Surface(
+                                shape = RoundedCornerShape(12.dp),
+                                color = StatusWarning.copy(alpha = 0.12f),
+                                border = BorderStroke(1.dp, StatusWarning.copy(alpha = 0.3f)),
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Text("Shizuku chưa sẵn sàng (${uiState.shizukuState}). Cần cài Shizuku và cấp quyền trước khi chạy.", style = MaterialTheme.typography.bodySmall, softWrap = true, fontSize = 11.sp, modifier = Modifier.padding(10.dp))
                             }
-                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
-                                Button(onClick = { viewModel.requestShizukuPermission() }, shape = RoundedCornerShape(20.dp), colors = ButtonDefaults.buttonColors(containerColor = VoLtePrimary), modifier = Modifier.weight(1f)) {
-                                    Text("Cấp quyền Shizuku", fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                            Column(verticalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+                                Button(
+                                    onClick = { viewModel.requestShizukuPermission() },
+                                    shape = RoundedCornerShape(20.dp),
+                                    colors = ButtonDefaults.buttonColors(containerColor = VoLtePrimary),
+                                    modifier = Modifier.fillMaxWidth()
+                                ) {
+                                    Text("Cấp quyền Shizuku", fontWeight = FontWeight.Bold, fontSize = 12.sp, maxLines = 1)
                                 }
-                                OutlinedButton(onClick = { viewModel.refreshShizukuState() }, shape = RoundedCornerShape(20.dp)) {
-                                    Text("Làm mới", fontSize = 13.sp)
+                                OutlinedButton(onClick = { viewModel.refreshShizukuState() }, shape = RoundedCornerShape(20.dp), modifier = Modifier.fillMaxWidth()) {
+                                    Text("Làm mới", fontSize = 12.sp)
                                 }
                             }
-                            TextButton(onClick = { viewModel.openShizukuDownloadPage(context) }, modifier = Modifier.fillMaxWidth()) { Text("Tải Shizuku (shizuku.rikka.app)") }
+                            TextButton(onClick = { viewModel.openShizukuDownloadPage(context) }, modifier = Modifier.fillMaxWidth()) { Text("Tải Shizuku (shizuku.rikka.app)", fontSize = 12.sp, maxLines = 1) }
                         } else {
                             Button(
                                 onClick = { viewModel.runSimpleShizukuFix() },
                                 enabled = !uiState.isRunningShizukuScript,
                                 shape = RoundedCornerShape(20.dp),
                                 colors = ButtonDefaults.buttonColors(containerColor = VoLtePrimary),
-                                modifier = Modifier.fillMaxWidth().height(48.dp)
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(48.dp)
                             ) {
                                 if (uiState.isRunningShizukuScript) {
-                                    CircularProgressIndicator(modifier = Modifier.size(18.dp), color = Color.White, strokeWidth = 2.dp)
+                                    CircularProgressIndicator(modifier = Modifier.size(16.dp), color = Color.White, strokeWidth = 2.dp)
                                     Spacer(Modifier.width(8.dp))
-                                    Text("Đang chạy…")
+                                    Text("Đang chạy…", fontSize = 12.sp)
                                 } else {
-                                    Icon(Icons.Default.Security, null, modifier = Modifier.size(18.dp))
-                                    Spacer(Modifier.width(8.dp))
-                                    Text("Chạy Shizuku Fix ngay", fontWeight = FontWeight.Bold)
+                                    Icon(Icons.Default.Security, null, modifier = Modifier.size(16.dp))
+                                    Spacer(Modifier.width(6.dp))
+                                    Text("Chạy Shizuku Fix ngay", fontWeight = FontWeight.Bold, fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
                                 }
                             }
                             if (uiState.shizukuLogs.isNotBlank()) {
                                 Surface(shape = RoundedCornerShape(12.dp), color = Color(0xFF0F1113), modifier = Modifier.fillMaxWidth()) {
-                                    Text(uiState.shizukuLogs.take(2000), color = Color(0xFFB0D0FF), style = MaterialTheme.typography.labelSmall, modifier = Modifier.padding(12.dp))
+                                    Text(uiState.shizukuLogs.take(2000), color = Color(0xFFB0D0FF), style = MaterialTheme.typography.labelSmall, softWrap = true, fontSize = 10.sp, modifier = Modifier.padding(10.dp))
                                 }
                             }
                             if (uiState.lastScriptResult != null) {
-                                Text(uiState.lastScriptResult!!, style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.SemiBold, color = StatusSuccess)
+                                Text(uiState.lastScriptResult!!, style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.SemiBold, color = StatusSuccess, softWrap = true, fontSize = 11.sp)
                             }
                         }
                     }
@@ -525,21 +779,59 @@ fun SimpleModeScreen(
 
         // Bottom: switch to classic + version
         item {
-            Card(shape = RoundedCornerShape(20.dp), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant), modifier = Modifier.fillMaxWidth()) {
-                Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text("Bạn đang ở bản Lite — giao diện siêu đơn giản", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    Text("Muốn xem đầy đủ 7 tabs (Chẩn đoán, Band, Mã ẩn, Cẩm nang, Đăng ký, IMS, Shizuku) như bản gốc? ", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    Button(onClick = onSwitchToClassic, shape = RoundedCornerShape(20.dp), colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.onSurface), modifier = Modifier.fillMaxWidth()) {
-                        Icon(Icons.Default.Settings, null, modifier = Modifier.size(16.dp))
+            Card(
+                shape = RoundedCornerShape(16.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(12.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    Text(
+                        "Bạn đang ở bản Lite — giao diện siêu đơn giản",
+                        style = MaterialTheme.typography.labelMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        softWrap = true,
+                        fontSize = 11.sp,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                    Text(
+                        "Muốn xem đầy đủ 7 tabs (Chẩn đoán, Band, Mã ẩn, Cẩm nang, Đăng ký, IMS, Shizuku) như bản gốc? ",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        softWrap = true,
+                        fontSize = 11.sp
+                    )
+                    Button(
+                        onClick = onSwitchToClassic,
+                        shape = RoundedCornerShape(20.dp),
+                        colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.onSurface),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Icon(Icons.Default.Settings, null, modifier = Modifier.size(14.dp))
                         Spacer(Modifier.width(6.dp))
-                        Text("Mở giao diện đầy đủ (Classic)")
+                        Text("Mở giao diện đầy đủ (Classic)", fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
                     }
-                    Text("VoLTE Checker Lite v1.0.4 • fork riêng • không thay thế bản gốc • ${uiState.deviceCode}", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text(
+                        "VoLTE Checker Lite v1.0.4 • fork riêng • branch lite-1.0.4 • ${uiState.deviceCode}",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        softWrap = true,
+                        fontSize = 10.sp,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis
+                    )
                 }
             }
         }
 
-        item { Spacer(Modifier.height(24.dp)) }
+        item { Spacer(Modifier.height(12.dp)) }
     }
 }
 
@@ -553,18 +845,57 @@ private fun SimpleRow(
     subtitle: String
 ) {
     Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.Top) {
-        Box(modifier = Modifier.size(28.dp).clip(CircleShape).background(color.copy(alpha = 0.12f)), contentAlignment = Alignment.Center) {
-            Text(number, fontWeight = FontWeight.ExtraBold, color = color, fontSize = 13.sp)
+        Box(
+            modifier = Modifier
+                .size(26.dp)
+                .clip(CircleShape)
+                .background(color.copy(alpha = 0.12f)),
+            contentAlignment = Alignment.Center
+        ) {
+            Text(number, fontWeight = FontWeight.ExtraBold, color = color, fontSize = 11.sp, maxLines = 1)
         }
-        Spacer(Modifier.width(10.dp))
+        Spacer(Modifier.width(8.dp))
         Column(modifier = Modifier.weight(1f)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(title, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
-                Icon(icon, null, tint = color, modifier = Modifier.size(18.dp))
+            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+                Text(
+                    title,
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 12.sp,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                    softWrap = true,
+                    modifier = Modifier.weight(1f)
+                )
+                Spacer(Modifier.width(6.dp))
+                Icon(icon, null, tint = color, modifier = Modifier.size(16.dp))
             }
-            Text(value, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onSurface, lineHeight = 17.sp)
+            Text(
+                value,
+                style = MaterialTheme.typography.bodyMedium,
+                fontWeight = FontWeight.SemiBold,
+                color = MaterialTheme.colorScheme.onSurface,
+                lineHeight = 15.sp,
+                softWrap = true,
+                fontSize = 12.sp,
+                maxLines = 3,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.fillMaxWidth()
+            )
             if (subtitle.isNotBlank()) {
-                Text(subtitle, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, lineHeight = 15.sp, modifier = Modifier.padding(top = 2.dp))
+                Text(
+                    subtitle,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    lineHeight = 14.sp,
+                    softWrap = true,
+                    fontSize = 11.sp,
+                    maxLines = 4,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(top = 2.dp)
+                )
             }
         }
     }
