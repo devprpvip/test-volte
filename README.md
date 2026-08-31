@@ -19,8 +19,12 @@ sha256sum app/build/outputs/apk/debug/app-debug.apk
 apksigner verify --print-certs app/build/outputs/apk/debug/app-debug.apk
 ```
 
+## Liên hệ
+- **Facebook:** https://www.facebook.com/minhhau036 — inbox hỗ trợ VoLTE / Shizuku / band
+- **Email:** minhhaulivetime@hotmail.com
+
 ## Credits
-Xem `CREDITS.md` — **devprpvip / Hậu Minh** (minhhaulivetime@hotmail.com)
+Xem `CREDITS.md` — **devprpvip / Hậu Minh** (minhhaulivetime@hotmail.com) — https://www.facebook.com/minhhau036
 
 ## License
 **Apache License 2.0** — xem `LICENSE`

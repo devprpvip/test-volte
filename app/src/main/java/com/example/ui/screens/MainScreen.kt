@@ -701,6 +701,7 @@ private fun CarrierRegistrationsTabContent(
 private fun TechnicalDetailsTabContent(
     uiState: com.example.ui.viewmodel.VolteCheckerUiState
 ) {
+    val context = androidx.compose.ui.platform.LocalContext.current
     LazyColumn(
         modifier = Modifier
             .fillMaxSize()
@@ -713,6 +714,46 @@ private fun TechnicalDetailsTabContent(
                 deviceInfo = uiState.deviceInfo,
                 carrierConfig = uiState.carrierConfig
             )
+        }
+        item {
+            Surface(
+                shape = RoundedCornerShape(24.dp),
+                color = MaterialTheme.colorScheme.surface,
+                border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Column(modifier = Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(Icons.Default.Info, contentDescription = null, tint = VoLtePrimary, modifier = Modifier.size(20.dp))
+                        Spacer(Modifier.width(8.dp))
+                        Text("Liên hệ hỗ trợ", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
+                    }
+                    Text("Cần hỗ trợ VoLTE / Shizuku / band? Liên hệ tác giả:", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Surface(shape = RoundedCornerShape(12.dp), color = VoLtePrimary.copy(alpha = 0.08f), border = androidx.compose.foundation.BorderStroke(1.dp, VoLtePrimary.copy(alpha = 0.2f)), modifier = Modifier.fillMaxWidth()) {
+                        Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                            Text("Hậu Minh — devprpvip", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
+                            Text("Facebook: https://www.facebook.com/minhhau036", style = MaterialTheme.typography.bodySmall, color = VoLtePrimary)
+                            Text("Email: minhhaulivetime@hotmail.com", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                    }
+                    Button(
+                        onClick = {
+                            try {
+                                val intent = android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse("https://www.facebook.com/minhhau036")).apply { addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK) }
+                                context.startActivity(intent)
+                            } catch (_: Exception) {}
+                        },
+                        shape = RoundedCornerShape(20.dp),
+                        colors = ButtonDefaults.buttonColors(containerColor = VoLtePrimary),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Icon(Icons.Default.Info, contentDescription = null, modifier = Modifier.size(16.dp))
+                        Spacer(Modifier.width(8.dp))
+                        Text("Mở Facebook", fontWeight = FontWeight.Bold)
+                    }
+                    Text("Apache 2.0 — Copyright 2026 devprpvip", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+            }
         }
 
         item {

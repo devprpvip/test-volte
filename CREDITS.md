@@ -2,9 +2,10 @@
 
 **VoLTE Checker — Check Volte**
 
-- **Author / Owner:** **devprpvip** — Hậu Minh (minhhaulivetime@hotmail.com)
+- **Author / Owner:** **devprpvip** — Hậu Minh (minhhaulivetime@hotmail.com) — Facebook: https://www.facebook.com/minhhau036
 - **Original Project:** https://github.com/mhau180/fsefef (cloned 2026-08-31)
 - **Maintained at:** https://github.com/devprpvip/test-volte
+- **Contact:** https://www.facebook.com/minhhau036 — inbox để hỗ trợ VoLTE / Shizuku
 
 ## Contributors
 - Hậu Minh — project owner, VoLTE diagnostics, band check, Shizuku integration, UI
