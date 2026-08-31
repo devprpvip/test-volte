@@ -1,0 +1,6 @@
+{
+  "name": "VoLTE Checker",
+  "description": "Kiểm tra tình trạng hỗ trợ VoLTE, kích hoạt IMS và tìm tùy chọn VoLTE bị ẩn trong cài đặt.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
